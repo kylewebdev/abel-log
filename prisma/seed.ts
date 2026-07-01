@@ -33,6 +33,8 @@ function aliasKey(scope: AliasScope, normalizedAliasText: string, teamId: number
 }
 
 async function main() {
+  // Default password applied only to freshly-created seed accounts. Existing
+  // users are never re-hashed on upsert, so rotated passwords survive re-seeds.
   const passwordHash = await hashPassword("password");
 
   const teams = await Promise.all(
@@ -53,7 +55,6 @@ async function main() {
     where: { username: "management" },
     update: {
       name: "Management",
-      passwordHash,
       role: Role.MANAGEMENT,
       teamId: null,
       isActive: true
@@ -72,7 +73,6 @@ async function main() {
       where: { username: team.slug },
       update: {
         name: team.name,
-        passwordHash,
         role: Role.TEAM,
         teamId: team.id,
         isActive: true

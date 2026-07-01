@@ -69,21 +69,6 @@ export default async function LoginPage({
               Log in
             </Button>
           </form>
-
-          <div className="mt-5 rounded-md border border-dashed border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-            <div className="stamp text-[0.65rem] font-bold text-foreground">
-              Seeded logins
-            </div>
-            <div className="mt-1.5 grid gap-0.5">
-              <span>
-                <strong className="text-foreground">management</strong> / password
-              </span>
-              <span>
-                <strong className="text-foreground">team-a</strong> –{" "}
-                <strong className="text-foreground">team-e</strong> / password
-              </span>
-            </div>
-          </div>
         </div>
       </div>
     </main>
