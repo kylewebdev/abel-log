@@ -7,7 +7,7 @@ import {
   Role,
   SaleStatus
 } from "@prisma/client";
-import { cookies } from "next/headers";
+import { AuthError } from "next-auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
@@ -19,9 +19,9 @@ import {
   parseDateInput,
   slugify
 } from "@/lib/format";
-import { SESSION_COOKIE, requireManagement, requireUser } from "@/lib/auth";
+import { requireManagement, requireUser } from "@/lib/auth";
 import { canManageItem } from "@/lib/permissions";
-import { verifyPassword } from "@/lib/password";
+import { signIn, signOut } from "@/auth";
 
 const DEFAULT_REDIRECT = "/sales";
 
@@ -72,33 +72,24 @@ export async function loginAction(formData: FormData) {
     redirect("/login?error=missing");
   }
 
-  const user = await prisma.user.findFirst({
-    where: {
+  try {
+    await signIn("credentials", {
       username,
-      isActive: true
+      password,
+      redirectTo: DEFAULT_REDIRECT
+    });
+  } catch (error) {
+    // A failed credential check throws AuthError; a successful sign-in throws
+    // the NEXT_REDIRECT control-flow error, which must be allowed to bubble.
+    if (error instanceof AuthError) {
+      redirect("/login?error=invalid");
     }
-  });
-
-  if (!user || !verifyPassword(password, user.passwordHash)) {
-    redirect("/login?error=invalid");
+    throw error;
   }
-
-  const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE, String(user.id), {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30
-  });
-
-  redirect(DEFAULT_REDIRECT);
 }
 
 export async function logoutAction() {
-  const cookieStore = await cookies();
-  cookieStore.delete(SESSION_COOKIE);
-  redirect("/login");
+  await signOut({ redirectTo: "/login" });
 }
 
 export async function createEstateSaleAction(formData: FormData) {

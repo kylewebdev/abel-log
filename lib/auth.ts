@@ -1,14 +1,17 @@
 import { Role } from "@prisma/client";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { auth } from "@/auth";
 
-export const SESSION_COOKIE = "abel_session_user";
-
+/**
+ * Resolve the signed Auth.js session to the fresh DB user (with team). Reading
+ * from the DB per request keeps role/team/active status authoritative — a
+ * deactivated or demoted user loses access immediately, without re-issuing the
+ * session token.
+ */
 export async function getCurrentUser() {
-  const cookieStore = await cookies();
-  const rawUserId = cookieStore.get(SESSION_COOKIE)?.value;
-  const userId = Number(rawUserId);
+  const session = await auth();
+  const userId = Number(session?.user?.id);
 
   if (!Number.isInteger(userId)) {
     return null;

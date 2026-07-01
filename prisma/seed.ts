@@ -33,7 +33,7 @@ function aliasKey(scope: AliasScope, normalizedAliasText: string, teamId: number
 }
 
 async function main() {
-  const passwordHash = hashPassword("password");
+  const passwordHash = await hashPassword("password");
 
   const teams = await Promise.all(
     ["Team A", "Team B", "Team C", "Team D", "Team E"].map((name) =>
