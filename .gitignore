@@ -1,0 +1,32 @@
+# dependencies
+node_modules/
+
+# next.js / build output
+.next/
+out/
+build/
+dist/
+coverage/
+
+# typescript / next generated
+*.tsbuildinfo
+next-env.d.ts
+
+# env files (keep the example)
+.env*
+!.env.example
+
+# local sqlite database
+prisma/*.db
+prisma/*.db-journal
+prisma/*.db-wal
+prisma/*.db-shm
+
+# logs
+*.log
+
+# os / editor cruft
+.DS_Store
+
+# deploy
+.vercel

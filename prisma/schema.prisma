@@ -1,0 +1,187 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  TEAM
+  MANAGEMENT
+}
+
+enum SaleStatus {
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum EntrySource {
+  PAPER
+  LIVE_APP
+  MANAGEMENT
+  OTHER
+}
+
+enum ReviewStatus {
+  NEEDS_REVIEW
+  APPROVED
+}
+
+enum AliasScope {
+  GLOBAL
+  TEAM
+}
+
+model Team {
+  id                 Int             @id @default(autoincrement())
+  name               String
+  slug               String          @unique
+  isActive           Boolean         @default(true)
+  users              User[]
+  createdEstateSales EstateSale[]    @relation("CreatedByTeam")
+  assignedSales      EstateSale[]    @relation("AssignedTeam")
+  soldItems          SoldItem[]
+  aliases            CategoryAlias[]
+  activityLogs       ActivityLog[]
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+}
+
+model User {
+  id                    Int             @id @default(autoincrement())
+  name                  String
+  username              String          @unique
+  passwordHash          String
+  role                  Role
+  teamId                Int?
+  team                  Team?           @relation(fields: [teamId], references: [id])
+  isActive              Boolean         @default(true)
+  createdEstateSales    EstateSale[]    @relation("CreatedByUser")
+  createdSoldItems      SoldItem[]      @relation("CreatedByUser")
+  archivedSoldItems     SoldItem[]      @relation("ArchivedByUser")
+  approvedAliases       CategoryAlias[] @relation("AliasApprovedBy")
+  activityLogs          ActivityLog[]
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+}
+
+model EstateSale {
+  id                  Int        @id @default(autoincrement())
+  addressRaw          String
+  formattedAddress    String?
+  normalizedAddress   String
+  addressLine1        String?
+  addressLine2        String?
+  city                String?
+  state               String?
+  postalCode          String?
+  country             String?
+  googlePlaceId       String?
+  latitude            Float?
+  longitude           Float?
+  saleName            String?
+  clientName          String?
+  notes               String?
+  status              SaleStatus @default(ACTIVE)
+  reportThresholdCents Int       @default(2500)
+  startDate           DateTime?
+  endDate             DateTime?
+  assignedTeamId      Int?
+  assignedTeam        Team?      @relation("AssignedTeam", fields: [assignedTeamId], references: [id])
+  createdByUserId     Int
+  createdByUser       User       @relation("CreatedByUser", fields: [createdByUserId], references: [id])
+  createdByTeamId     Int?
+  createdByTeam       Team?      @relation("CreatedByTeam", fields: [createdByTeamId], references: [id])
+  soldItems           SoldItem[]
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+  archivedAt          DateTime?
+
+  @@index([status])
+  @@index([normalizedAddress, status])
+  @@index([googlePlaceId, status])
+}
+
+model SoldItem {
+  id                 Int             @id @default(autoincrement())
+  estateSaleId       Int
+  estateSale         EstateSale      @relation(fields: [estateSaleId], references: [id])
+  submittedTeamId    Int
+  submittedTeam      Team            @relation(fields: [submittedTeamId], references: [id])
+  createdByUserId    Int
+  createdByUser      User            @relation("CreatedByUser", fields: [createdByUserId], references: [id])
+  itemDescription    String
+  finalSoldPriceCents Int
+  teamLabel          String?
+  reportCategoryId   Int?
+  reportCategory     ReportCategory? @relation(fields: [reportCategoryId], references: [id])
+  entrySource        EntrySource     @default(LIVE_APP)
+  reviewStatus       ReviewStatus    @default(NEEDS_REVIEW)
+  isArchived         Boolean         @default(false)
+  archivedAt         DateTime?
+  archivedByUserId   Int?
+  archivedByUser     User?           @relation("ArchivedByUser", fields: [archivedByUserId], references: [id])
+  archiveReason      String?
+  soldDate           DateTime?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@index([estateSaleId, isArchived])
+  @@index([submittedTeamId])
+  @@index([reportCategoryId])
+  @@index([reviewStatus])
+}
+
+model ReportCategory {
+  id          Int             @id @default(autoincrement())
+  name        String          @unique
+  slug        String          @unique
+  sortOrder   Int?
+  isActive    Boolean         @default(true)
+  soldItems   SoldItem[]
+  aliases     CategoryAlias[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model CategoryAlias {
+  id                  Int            @id @default(autoincrement())
+  aliasKey            String         @unique
+  aliasText           String
+  normalizedAliasText String
+  reportCategoryId    Int
+  reportCategory      ReportCategory @relation(fields: [reportCategoryId], references: [id])
+  teamId              Int?
+  team                Team?          @relation(fields: [teamId], references: [id])
+  scope               AliasScope     @default(GLOBAL)
+  isApproved          Boolean        @default(false)
+  usageCount          Int            @default(0)
+  createdByUserId     Int?
+  approvedByUserId    Int?
+  approvedByUser      User?          @relation("AliasApprovedBy", fields: [approvedByUserId], references: [id])
+  approvedAt          DateTime?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  @@index([normalizedAliasText])
+}
+
+model ActivityLog {
+  id          Int      @id @default(autoincrement())
+  actorUserId Int
+  actorUser   User     @relation(fields: [actorUserId], references: [id])
+  actorTeamId Int?
+  actorTeam   Team?    @relation(fields: [actorTeamId], references: [id])
+  entityType  String
+  entityId    Int
+  action      String
+  beforeJson  String?
+  afterJson   String?
+  createdAt   DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorUserId])
+}

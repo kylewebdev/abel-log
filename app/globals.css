@@ -1,0 +1,132 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+
+    /* Field-ledger palette: warm paper, ink, stamp-vermilion accent.
+       Tuned for high contrast in bright checkout / garage daylight. */
+    --background: oklch(95.8% 0.015 84deg);
+    --foreground: oklch(21% 0.018 262deg);
+    --card: oklch(99.2% 0.006 88deg);
+    --card-foreground: var(--foreground);
+    --popover: var(--card);
+    --popover-foreground: var(--foreground);
+    --primary: oklch(27% 0.03 258deg);
+    --primary-foreground: oklch(98% 0.008 88deg);
+    --secondary: oklch(89% 0.035 152deg);
+    --secondary-foreground: oklch(30% 0.06 162deg);
+    --muted: oklch(92.5% 0.013 84deg);
+    --muted-foreground: oklch(45% 0.02 260deg);
+    --accent: oklch(58.5% 0.196 33deg);
+    --accent-foreground: oklch(99% 0.01 80deg);
+    --destructive: oklch(54% 0.2 26deg);
+    --destructive-foreground: oklch(99% 0.006 86deg);
+    --success: oklch(52% 0.13 152deg);
+    --success-foreground: oklch(99% 0.006 86deg);
+    --warning: oklch(73% 0.15 78deg);
+    --warning-foreground: oklch(27% 0.06 70deg);
+    --border: oklch(81% 0.017 86deg);
+    --input: oklch(78% 0.02 86deg);
+    --ring: oklch(58.5% 0.196 33deg);
+    --radius: 0.625rem;
+
+    --font-display: "Bricolage Grotesque", "Hanken Grotesk", ui-sans-serif,
+      system-ui, sans-serif;
+    --font-sans: "Hanken Grotesk", ui-sans-serif, system-ui, -apple-system,
+      "Segoe UI", sans-serif;
+    --font-mono: "Spline Sans Mono", ui-monospace, "SFMono-Regular", "Menlo",
+      monospace;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+    font-feature-settings:
+      "rlig" 1,
+      "calt" 1;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.012em;
+  }
+
+  h1,
+  h2,
+  h3,
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Keep numeric fields tabular by default for clean alignment. */
+  input[inputmode="decimal"],
+  input[type="date"] {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  .focus-ring {
+    @apply outline-none ring-offset-2 ring-offset-background focus-visible:ring-2 focus-visible:ring-ring;
+  }
+
+  /* Faint ledger paper grid for app/background atmosphere. */
+  .ledger-grid {
+    background-image:
+      linear-gradient(oklch(81% 0.017 86deg / 0.45) 1px, transparent 1px),
+      linear-gradient(90deg, oklch(81% 0.017 86deg / 0.32) 1px, transparent 1px);
+    background-size: 30px 30px;
+  }
+
+  /* Tabular monospace, used for every price + stat readout. */
+  .price {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Carbon-receipt perforation rule. */
+  .perforated {
+    background-image: repeating-linear-gradient(
+      90deg,
+      var(--border) 0,
+      var(--border) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+    height: 2px;
+  }
+
+  /* Rubber-stamp chip for SOLD / status flourishes. */
+  .stamp {
+    font-family: var(--font-display);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
