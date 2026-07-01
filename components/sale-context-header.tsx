@@ -31,7 +31,7 @@ export function SaleContextHeader({
   active?: "quick" | "batch" | "report";
 }) {
   return (
-    <section className="pt-safe sticky top-14 z-30 -mx-4 mb-4 border-b border-border bg-card/95 px-4 backdrop-blur-md md:-mx-6 md:px-6">
+    <section className="pt-safe sticky top-14 z-30 -mx-4 mb-4 border-b border-border bg-card/95 px-4 backdrop-blur-md md:-mx-6 md:px-6 print:hidden">
       <div className="mx-auto max-w-6xl space-y-2.5 py-2.5">
         <div className="flex items-center justify-between gap-3">
           <Link

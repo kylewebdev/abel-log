@@ -26,7 +26,7 @@ export function AppShell({
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="pt-safe sticky top-0 z-40 border-b border-border bg-card/85 backdrop-blur-md">
+      <header className="pt-safe sticky top-0 z-40 border-b border-border bg-card/85 backdrop-blur-md print:hidden">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 md:px-6">
           <AppNav role={user.role} />
 

@@ -130,3 +130,31 @@
     padding-top: env(safe-area-inset-top, 0px);
   }
 }
+
+/* Print / save-as-PDF: strip app chrome and lay the report out on clean paper.
+   Element-level hiding and page-break control live on the components via
+   Tailwind `print:` / `break-inside-avoid` utilities. */
+@media print {
+  /* Zero page margin so the browser defaults to "no margins" and omits its
+     own header/footer (URL, date, page numbers). The report keeps a
+     comfortable inner margin via padding on <main> instead of edge-to-edge. */
+  @page {
+    margin: 0;
+  }
+
+  body {
+    background: #fff !important;
+  }
+
+  main {
+    padding: 1.2cm 1.3cm !important;
+  }
+
+  /* Render category fills, badges, and rules faithfully in the exported PDF. */
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
