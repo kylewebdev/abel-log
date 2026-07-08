@@ -19,6 +19,9 @@ next-env.d.ts
 # logs
 *.log
 
+# local QA artifacts
+screenshots/
+
 # os / editor cruft
 .DS_Store
 
