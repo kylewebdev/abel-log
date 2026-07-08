@@ -191,29 +191,42 @@ function SaleCard({
           isEnded && "bg-muted/15"
         )}
       >
-        <Button
-          asChild
-          size="lg"
-          variant={isEnded ? "outline" : "accent"}
-          className="col-span-2"
-        >
-          <Link href={`/sales/${sale.id}/quick-entry`}>
-            <NotebookPen aria-hidden="true" />
-            Add items
-          </Link>
-        </Button>
+        {isEnded ? (
+          <Button asChild size="lg" variant="accent" className="col-span-2">
+            <Link href={`/sales/${sale.id}/report`}>
+              <FileBarChart2 aria-hidden="true" />
+              Report
+            </Link>
+          </Button>
+        ) : (
+          <Button asChild size="lg" variant="accent" className="col-span-2">
+            <Link href={`/sales/${sale.id}/quick-entry`}>
+              <NotebookPen aria-hidden="true" />
+              Add items
+            </Link>
+          </Button>
+        )}
         <Button asChild variant="outline">
           <Link href={`/sales/${sale.id}/batch`}>
             <Rows3 aria-hidden="true" />
             Batch
           </Link>
         </Button>
-        <Button asChild variant="outline">
-          <Link href={`/sales/${sale.id}/report`}>
-            <FileBarChart2 aria-hidden="true" />
-            Report
-          </Link>
-        </Button>
+        {isEnded ? (
+          <Button asChild variant="outline">
+            <Link href={`/sales/${sale.id}/quick-entry`}>
+              <NotebookPen aria-hidden="true" />
+              Add items
+            </Link>
+          </Button>
+        ) : (
+          <Button asChild variant="outline">
+            <Link href={`/sales/${sale.id}/report`}>
+              <FileBarChart2 aria-hidden="true" />
+              Report
+            </Link>
+          </Button>
+        )}
       </div>
     </Card>
   );
