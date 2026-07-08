@@ -150,7 +150,7 @@
     padding: 1.2cm 1.3cm !important;
   }
 
-  /* Render category fills, badges, and rules faithfully in the exported PDF. */
+  /* Render report fills, badges, and rules faithfully in the exported PDF. */
   *,
   *::before,
   *::after {

@@ -51,6 +51,11 @@ export default async function NewSalePage({
             An address is required to create a sale.
           </div>
         ) : null}
+        {params.error === "team" ? (
+          <div className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-sm font-semibold text-destructive">
+            This team account is not assigned to an active team.
+          </div>
+        ) : null}
 
         <form action={createEstateSaleAction} className="mt-5">
           <div className="space-y-1.5">

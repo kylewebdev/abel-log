@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { Plus, SlidersHorizontal, History } from "lucide-react";
-import { Role } from "@prisma/client";
+import { notFound, redirect } from "next/navigation";
+import { Plus, History } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { canManageSaleItems } from "@/lib/permissions";
 import { createSoldItemAction } from "@/lib/actions";
 import { centsToDollars } from "@/lib/format";
 import { AppShell } from "@/components/app-shell";
@@ -12,7 +12,6 @@ import { StatusMessage } from "@/components/status-message";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
 
 export default async function QuickEntryPage({
   params,
@@ -29,36 +28,15 @@ export default async function QuickEntryPage({
     notFound();
   }
 
-  const [sale, categories, teams, aliases, recentItems] = await Promise.all([
+  const [sale, recentItems] = await Promise.all([
     prisma.estateSale.findUnique({
       where: { id: saleId },
       include: { assignedTeam: true }
     }),
-    prisma.reportCategory.findMany({
-      where: { isActive: true },
-      orderBy: [{ sortOrder: "asc" }, { name: "asc" }]
-    }),
-    prisma.team.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
-    prisma.categoryAlias.findMany({
-      where: {
-        isApproved: true,
-        OR: [
-          { scope: "GLOBAL", teamId: null },
-          ...(user.teamId ? [{ scope: "TEAM" as const, teamId: user.teamId }] : [])
-        ]
-      },
-      include: { reportCategory: true },
-      orderBy: [{ usageCount: "desc" }, { aliasText: "asc" }],
-      take: 8
-    }),
     prisma.soldItem.findMany({
       where: {
-        estateSaleId: saleId,
-        ...(user.role === Role.TEAM && user.teamId
-          ? { submittedTeamId: user.teamId }
-          : {})
+        estateSaleId: saleId
       },
-      include: { submittedTeam: true },
       orderBy: { createdAt: "desc" },
       take: 6
     })
@@ -68,8 +46,11 @@ export default async function QuickEntryPage({
     notFound();
   }
 
+  if (!canManageSaleItems(user, sale)) {
+    redirect(`/sales/${sale.id}?error=permission`);
+  }
+
   const paramsValue = (await searchParams) ?? {};
-  const isManager = user.role === Role.MANAGEMENT;
   const justSaved = Boolean(paramsValue.saved);
 
   return (
@@ -126,63 +107,6 @@ export default async function QuickEntryPage({
             </p>
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="teamLabel">Team label or hint (optional)</Label>
-            <Input
-              id="teamLabel"
-              name="teamLabel"
-              list="category-suggestions"
-              placeholder="patio lot, garage stuff, wall art…"
-              autoComplete="off"
-            />
-            <datalist id="category-suggestions">
-              {aliases.map((alias) => (
-                <option
-                  key={alias.id}
-                  value={alias.aliasText}
-                  label={alias.reportCategory.name}
-                />
-              ))}
-            </datalist>
-          </div>
-
-          {isManager ? (
-            <details className="rounded-md border border-border bg-muted/30">
-              <summary className="flex cursor-pointer items-center gap-2 p-3 text-sm font-bold">
-                <SlidersHorizontal className="size-4" aria-hidden="true" />
-                Manager options — team &amp; category
-              </summary>
-              <div className="grid gap-4 border-t border-border p-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="submittedTeamId">Submitting team</Label>
-                  <Select
-                    id="submittedTeamId"
-                    name="submittedTeamId"
-                    defaultValue={
-                      sale.assignedTeamId ? String(sale.assignedTeamId) : undefined
-                    }
-                  >
-                    {teams.map((team) => (
-                      <option key={team.id} value={team.id}>
-                        {team.name}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="reportCategoryId">Report category</Label>
-                  <Select id="reportCategoryId" name="reportCategoryId">
-                    <option value="">Leave uncategorized</option>
-                    {categories.map((category) => (
-                      <option key={category.id} value={category.id}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-              </div>
-            </details>
-          ) : null}
         </div>
 
         {/* Sticky thumb-zone action bar — the repeated checkout action lives here. */}
@@ -214,7 +138,7 @@ export default async function QuickEntryPage({
       <section className="mt-6">
         <div className="mb-2 flex items-center gap-2 text-sm font-bold text-muted-foreground">
           <History className="size-4" aria-hidden="true" />
-          {isManager ? "Recently logged" : "Your recent entries"}
+          Recently logged
         </div>
         {recentItems.length === 0 ? (
           <p className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
@@ -237,9 +161,6 @@ export default async function QuickEntryPage({
                         Just added
                       </span>
                     ) : null}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {item.submittedTeam.name}
                   </div>
                 </div>
                 <span className="price shrink-0 text-lg font-bold">

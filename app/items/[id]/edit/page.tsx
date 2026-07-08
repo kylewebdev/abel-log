@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Archive, ArrowLeft, RotateCcw, Save } from "lucide-react";
-import { Role, ReviewStatus } from "@prisma/client";
+import { Archive, ArrowLeft, RotateCcw, Save, Trash2 } from "lucide-react";
+import { Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import {
   archiveSoldItemAction,
+  deleteSoldItemAction,
   restoreSoldItemAction,
   updateSoldItemAction
 } from "@/lib/actions";
@@ -15,8 +16,8 @@ import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmButton } from "@/components/confirm-button";
 
 export default async function EditItemPage({
   params,
@@ -33,20 +34,12 @@ export default async function EditItemPage({
     notFound();
   }
 
-  const [item, categories] = await Promise.all([
-    prisma.soldItem.findUnique({
-      where: { id: itemId },
-      include: {
-        estateSale: true,
-        submittedTeam: true,
-        reportCategory: true
-      }
-    }),
-    prisma.reportCategory.findMany({
-      where: { isActive: true },
-      orderBy: [{ sortOrder: "asc" }, { name: "asc" }]
-    })
-  ]);
+  const item = await prisma.soldItem.findUnique({
+    where: { id: itemId },
+    include: {
+      estateSale: true
+    }
+  });
 
   if (!item) {
     notFound();
@@ -84,7 +77,7 @@ export default async function EditItemPage({
           {item.itemDescription}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {saleTitle(item.estateSale)} · {item.submittedTeam.name}
+          {saleTitle(item.estateSale)}
         </p>
 
         {paramsValue.error === "missing" ? (
@@ -106,71 +99,29 @@ export default async function EditItemPage({
               required
             />
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="price">Final sold price</Label>
-              <div className="relative">
-                <span
-                  className="price pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-lg font-bold text-muted-foreground"
-                  aria-hidden="true"
-                >
-                  $
-                </span>
-                <Input
-                  id="price"
-                  name="price"
-                  inputMode="decimal"
-                  defaultValue={centsToInput(item.finalSoldPriceCents)}
-                  className="price h-14 pl-8 text-xl font-bold"
-                  required
-                />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="teamLabel">Team label</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="price">Final sold price</Label>
+            <div className="relative max-w-xs">
+              <span
+                className="price pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-lg font-bold text-muted-foreground"
+                aria-hidden="true"
+              >
+                $
+              </span>
               <Input
-                id="teamLabel"
-                name="teamLabel"
-                defaultValue={item.teamLabel ?? ""}
+                id="price"
+                name="price"
+                inputMode="decimal"
+                defaultValue={centsToInput(item.finalSoldPriceCents)}
+                className="price h-14 pl-8 text-xl font-bold"
+                required
               />
             </div>
           </div>
 
-          {isManager ? (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="reportCategoryId">Report category</Label>
-                <Select
-                  id="reportCategoryId"
-                  name="reportCategoryId"
-                  defaultValue={
-                    item.reportCategoryId ? String(item.reportCategoryId) : ""
-                  }
-                >
-                  <option value="">Uncategorized</option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="reviewStatus">Review status</Label>
-                <Select
-                  id="reviewStatus"
-                  name="reviewStatus"
-                  defaultValue={item.reviewStatus}
-                >
-                  <option value={ReviewStatus.NEEDS_REVIEW}>Needs review</option>
-                  <option value={ReviewStatus.APPROVED}>Approved</option>
-                </Select>
-              </div>
-            </div>
-          ) : null}
         </form>
 
-        <div className="mt-6 border-t border-border pt-4">
+        <div className="mt-6 flex flex-wrap gap-2 border-t border-border pt-4">
           {!item.isArchived ? (
             <form action={archiveSoldItemAction}>
               <input type="hidden" name="itemId" value={item.id} />
@@ -190,6 +141,18 @@ export default async function EditItemPage({
               </Button>
             </form>
           ) : null}
+          <form action={deleteSoldItemAction}>
+            <input type="hidden" name="itemId" value={item.id} />
+            <input type="hidden" name="next" value={`/sales/${item.estateSaleId}`} />
+            <ConfirmButton
+              type="submit"
+              variant="destructive"
+              confirmMessage={`Permanently delete "${item.itemDescription}"? This cannot be undone.`}
+            >
+              <Trash2 aria-hidden="true" />
+              Delete item permanently
+            </ConfirmButton>
+          </form>
         </div>
       </div>
 

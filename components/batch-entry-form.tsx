@@ -5,20 +5,11 @@ import { Plus, Save, Trash2 } from "lucide-react";
 import { createBatchItemsAction } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
 
 type Row = {
   id: number;
   description: string;
   price: string;
-  teamLabel: string;
-  notes: string;
-};
-
-type Team = {
-  id: number;
-  name: string;
 };
 
 let rowCounter = 0;
@@ -27,22 +18,14 @@ function blankRow(): Row {
   return {
     id: rowCounter,
     description: "",
-    price: "",
-    teamLabel: "",
-    notes: ""
+    price: ""
   };
 }
 
 export function BatchEntryForm({
-  saleId,
-  teams,
-  showTeamPicker,
-  defaultTeamId
+  saleId
 }: {
   saleId: number;
-  teams: Team[];
-  showTeamPicker: boolean;
-  defaultTeamId?: number | null;
 }) {
   const [rows, setRows] = useState<Row[]>(() => [blankRow(), blankRow(), blankRow()]);
 
@@ -71,23 +54,6 @@ export function BatchEntryForm({
   return (
     <form action={createBatchItemsAction}>
       <input type="hidden" name="saleId" value={saleId} />
-
-      {showTeamPicker ? (
-        <div className="mb-4 space-y-1.5">
-          <Label htmlFor="submittedTeamId">Submitting team</Label>
-          <Select
-            id="submittedTeamId"
-            name="submittedTeamId"
-            defaultValue={defaultTeamId ? String(defaultTeamId) : undefined}
-          >
-            {teams.map((team) => (
-              <option key={team.id} value={team.id}>
-                {team.name}
-              </option>
-            ))}
-          </Select>
-        </div>
-      ) : null}
 
       <div className="space-y-3">
         {rows.map((row, index) => (
@@ -122,45 +88,25 @@ export function BatchEntryForm({
               autoComplete="off"
             />
 
-            <div className="grid grid-cols-2 gap-2">
-              <div className="relative">
-                <span
-                  className="price pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-base font-bold text-muted-foreground"
-                  aria-hidden="true"
-                >
-                  $
-                </span>
-                <Input
-                  name="price[]"
-                  inputMode="decimal"
-                  value={row.price}
-                  onChange={(event) =>
-                    updateRow(row.id, { price: event.target.value })
-                  }
-                  placeholder="0.00"
-                  className="price pl-7 font-bold"
-                  autoComplete="off"
-                />
-              </div>
+            <div className="relative max-w-xs">
+              <span
+                className="price pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-base font-bold text-muted-foreground"
+                aria-hidden="true"
+              >
+                $
+              </span>
               <Input
-                name="teamLabel[]"
-                value={row.teamLabel}
+                name="price[]"
+                inputMode="decimal"
+                value={row.price}
                 onChange={(event) =>
-                  updateRow(row.id, { teamLabel: event.target.value })
+                  updateRow(row.id, { price: event.target.value })
                 }
-                placeholder="Label (optional)"
+                placeholder="0.00"
+                className="price pl-7 font-bold"
                 autoComplete="off"
               />
             </div>
-
-            <Input
-              name="notes[]"
-              value={row.notes}
-              onChange={(event) => updateRow(row.id, { notes: event.target.value })}
-              placeholder="Notes — initials, area, bundle detail (optional)"
-              className="text-sm"
-              autoComplete="off"
-            />
           </div>
         ))}
       </div>

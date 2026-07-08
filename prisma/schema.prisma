@@ -26,16 +26,6 @@ enum EntrySource {
   OTHER
 }
 
-enum ReviewStatus {
-  NEEDS_REVIEW
-  APPROVED
-}
-
-enum AliasScope {
-  GLOBAL
-  TEAM
-}
-
 model Team {
   id                 Int             @id @default(autoincrement())
   name               String
@@ -44,8 +34,6 @@ model Team {
   users              User[]
   createdEstateSales EstateSale[]    @relation("CreatedByTeam")
   assignedSales      EstateSale[]    @relation("AssignedTeam")
-  soldItems          SoldItem[]
-  aliases            CategoryAlias[]
   activityLogs       ActivityLog[]
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @updatedAt
@@ -63,7 +51,6 @@ model User {
   createdEstateSales    EstateSale[]    @relation("CreatedByUser")
   createdSoldItems      SoldItem[]      @relation("CreatedByUser")
   archivedSoldItems     SoldItem[]      @relation("ArchivedByUser")
-  approvedAliases       CategoryAlias[] @relation("AliasApprovedBy")
   activityLogs          ActivityLog[]
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
@@ -110,17 +97,11 @@ model SoldItem {
   id                 Int             @id @default(autoincrement())
   estateSaleId       Int
   estateSale         EstateSale      @relation(fields: [estateSaleId], references: [id])
-  submittedTeamId    Int
-  submittedTeam      Team            @relation(fields: [submittedTeamId], references: [id])
   createdByUserId    Int
   createdByUser      User            @relation("CreatedByUser", fields: [createdByUserId], references: [id])
   itemDescription    String
   finalSoldPriceCents Int
-  teamLabel          String?
-  reportCategoryId   Int?
-  reportCategory     ReportCategory? @relation(fields: [reportCategoryId], references: [id])
   entrySource        EntrySource     @default(LIVE_APP)
-  reviewStatus       ReviewStatus    @default(NEEDS_REVIEW)
   isArchived         Boolean         @default(false)
   archivedAt         DateTime?
   archivedByUserId   Int?
@@ -131,43 +112,6 @@ model SoldItem {
   updatedAt          DateTime        @updatedAt
 
   @@index([estateSaleId, isArchived])
-  @@index([submittedTeamId])
-  @@index([reportCategoryId])
-  @@index([reviewStatus])
-}
-
-model ReportCategory {
-  id          Int             @id @default(autoincrement())
-  name        String          @unique
-  slug        String          @unique
-  sortOrder   Int?
-  isActive    Boolean         @default(true)
-  soldItems   SoldItem[]
-  aliases     CategoryAlias[]
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-}
-
-model CategoryAlias {
-  id                  Int            @id @default(autoincrement())
-  aliasKey            String         @unique
-  aliasText           String
-  normalizedAliasText String
-  reportCategoryId    Int
-  reportCategory      ReportCategory @relation(fields: [reportCategoryId], references: [id])
-  teamId              Int?
-  team                Team?          @relation(fields: [teamId], references: [id])
-  scope               AliasScope     @default(GLOBAL)
-  isApproved          Boolean        @default(false)
-  usageCount          Int            @default(0)
-  createdByUserId     Int?
-  approvedByUserId    Int?
-  approvedByUser      User?          @relation("AliasApprovedBy", fields: [approvedByUserId], references: [id])
-  approvedAt          DateTime?
-  createdAt           DateTime       @default(now())
-  updatedAt           DateTime       @updatedAt
-
-  @@index([normalizedAliasText])
 }
 
 model ActivityLog {

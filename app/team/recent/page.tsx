@@ -1,14 +1,19 @@
 import Link from "next/link";
-import { Archive, Edit3, RotateCcw } from "lucide-react";
-import { Role, ReviewStatus } from "@prisma/client";
+import { Archive, Edit3, RotateCcw, Trash2 } from "lucide-react";
+import { Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { archiveSoldItemAction, restoreSoldItemAction } from "@/lib/actions";
+import {
+  archiveSoldItemAction,
+  deleteSoldItemAction,
+  restoreSoldItemAction
+} from "@/lib/actions";
 import { canManageItem } from "@/lib/permissions";
 import { centsToDollars, saleTitle, shortDate } from "@/lib/format";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmButton } from "@/components/confirm-button";
 
 export default async function TeamRecentPage() {
   const user = await requireUser();
@@ -17,12 +22,12 @@ export default async function TeamRecentPage() {
     where: isManager
       ? {}
       : {
-          submittedTeamId: user.teamId ?? -1
+          estateSale: {
+            assignedTeamId: user.teamId ?? -1
+          }
         },
     include: {
-      estateSale: true,
-      submittedTeam: true,
-      reportCategory: true
+      estateSale: true
     },
     orderBy: {
       createdAt: "desc"
@@ -41,8 +46,8 @@ export default async function TeamRecentPage() {
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {isManager
-            ? "Every recently submitted row across teams."
-            : "Edit or archive your team's active entries. Archived rows stay for context."}
+            ? "Edit, archive, restore, or delete recently submitted rows across sales."
+            : "Edit, archive, or delete entries for your team's assigned sales. Archived rows stay for context."}
         </p>
       </div>
 
@@ -53,8 +58,8 @@ export default async function TeamRecentPage() {
       ) : (
         <ul className="space-y-2">
           {items.map((item) => {
-            const canEdit =
-              canManageItem(user, item) && (isManager || !item.isArchived);
+            const canManage = canManageItem(user, item);
+            const canEdit = canManage && (isManager || !item.isArchived);
 
             return (
               <li
@@ -75,7 +80,7 @@ export default async function TeamRecentPage() {
                       {saleTitle(item.estateSale)}
                     </Link>
                     <div className="text-xs text-muted-foreground">
-                      {item.submittedTeam.name} · {shortDate(item.createdAt)}
+                      Added {shortDate(item.createdAt)}
                     </div>
                   </div>
                   <div className="price shrink-0 text-lg font-bold">
@@ -85,35 +90,19 @@ export default async function TeamRecentPage() {
 
                 <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    {item.reportCategory ? (
-                      <Badge variant="secondary">{item.reportCategory.name}</Badge>
-                    ) : (
-                      <Badge variant="warning">Uncategorized</Badge>
-                    )}
-                    {isManager ? (
-                      <Badge
-                        variant={
-                          item.reviewStatus === ReviewStatus.APPROVED
-                            ? "success"
-                            : "warning"
-                        }
-                      >
-                        {item.reviewStatus === ReviewStatus.APPROVED
-                          ? "Approved"
-                          : "Needs review"}
-                      </Badge>
-                    ) : null}
                     {item.isArchived ? <Badge variant="muted">Archived</Badge> : null}
                   </div>
 
-                  {canEdit ? (
+                  {canManage ? (
                     <div className="ml-auto flex items-center gap-1.5">
-                      <Button asChild variant="outline" size="sm">
-                        <Link href={`/items/${item.id}/edit?next=/team/recent`}>
-                          <Edit3 aria-hidden="true" />
-                          Edit
-                        </Link>
-                      </Button>
+                      {canEdit ? (
+                        <Button asChild variant="outline" size="sm">
+                          <Link href={`/items/${item.id}/edit?next=/team/recent`}>
+                            <Edit3 aria-hidden="true" />
+                            Edit
+                          </Link>
+                        </Button>
+                      ) : null}
                       {!item.isArchived ? (
                         <form action={archiveSoldItemAction}>
                           <input type="hidden" name="itemId" value={item.id} />
@@ -133,6 +122,20 @@ export default async function TeamRecentPage() {
                           </Button>
                         </form>
                       ) : null}
+                      <form action={deleteSoldItemAction}>
+                        <input type="hidden" name="itemId" value={item.id} />
+                        <input type="hidden" name="next" value="/team/recent" />
+                        <ConfirmButton
+                          type="submit"
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          confirmMessage={`Permanently delete "${item.itemDescription}"? This cannot be undone.`}
+                        >
+                          <Trash2 aria-hidden="true" />
+                          Delete
+                        </ConfirmButton>
+                      </form>
                     </div>
                   ) : null}
                 </div>

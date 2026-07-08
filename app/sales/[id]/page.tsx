@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import {
   Archive,
   Edit3,
@@ -10,17 +10,18 @@ import {
   Rows3,
   Trash2
 } from "lucide-react";
-import { Role, ReviewStatus, SaleStatus } from "@prisma/client";
+import { Role, SaleStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import {
   archiveEstateSaleAction,
   archiveSoldItemAction,
+  deleteSoldItemAction,
   deleteEstateSaleAction,
   restoreSoldItemAction,
   updateEstateSaleAction
 } from "@/lib/actions";
-import { canManageItem } from "@/lib/permissions";
+import { canManageSaleItems } from "@/lib/permissions";
 import { centsToDollars, centsToInput, saleTitle, shortDate } from "@/lib/format";
 import { AppShell } from "@/components/app-shell";
 import { StatusMessage } from "@/components/status-message";
@@ -38,6 +39,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfirmButton } from "@/components/confirm-button";
+import { cn } from "@/lib/utils";
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
@@ -73,11 +75,6 @@ export default async function SaleDetailPage({
         createdByUser: true,
         createdByTeam: true,
         soldItems: {
-          include: {
-            submittedTeam: true,
-            reportCategory: true,
-            archivedByUser: true
-          },
           orderBy: {
             createdAt: "desc"
           }
@@ -96,11 +93,17 @@ export default async function SaleDetailPage({
 
   const paramsValue = (await searchParams) ?? {};
   const isManager = user.role === Role.MANAGEMENT;
+
+  if (!canManageSaleItems(user, sale)) {
+    redirect("/sales?error=permission");
+  }
+
+  const canEditSale = canManageSaleItems(user, sale);
   const activeItems = sale.soldItems.filter((item) => !item.isArchived);
   const archivedItems = sale.soldItems.filter((item) => item.isArchived);
-  const needsReview = activeItems.filter(
-    (item) => item.reviewStatus === ReviewStatus.NEEDS_REVIEW
-  );
+  const activeView = paramsValue.view === "details" ? "details" : "entries";
+  const entriesHref = `/sales/${sale.id}`;
+  const detailsHref = `/sales/${sale.id}?view=details`;
 
   return (
     <AppShell user={user}>
@@ -135,7 +138,7 @@ export default async function SaleDetailPage({
 
       {paramsValue.error === "permission" ? (
         <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-sm font-semibold text-destructive">
-          Teams can edit or archive only entries submitted by their own team.
+          Teams can edit entries only for sales assigned to their team.
         </div>
       ) : null}
 
@@ -161,270 +164,142 @@ export default async function SaleDetailPage({
         </Button>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
-        <section className="space-y-4">
-          <div
-            className={`grid gap-2 ${isManager ? "grid-cols-3" : "grid-cols-2"}`}
-          >
-            <Stat label="Active" value={activeItems.length} />
-            {isManager ? <Stat label="To review" value={needsReview.length} /> : null}
-            <Stat label="Archived" value={archivedItems.length} />
-          </div>
+      <nav
+        className="mb-5 grid grid-cols-2 overflow-hidden rounded-lg border border-border bg-card p-1 shadow-sm"
+        aria-label="Sale view"
+      >
+        <Link
+          href={entriesHref}
+          aria-current={activeView === "entries" ? "page" : undefined}
+          className={cn(
+            "focus-ring rounded-md px-3 py-2 text-center text-sm font-bold transition-colors",
+            activeView === "entries"
+              ? "bg-primary text-primary-foreground shadow-sm"
+              : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+          )}
+        >
+          Entries
+        </Link>
+        <Link
+          href={detailsHref}
+          aria-current={activeView === "details" ? "page" : undefined}
+          className={cn(
+            "focus-ring rounded-md px-3 py-2 text-center text-sm font-bold transition-colors",
+            activeView === "details"
+              ? "bg-primary text-primary-foreground shadow-sm"
+              : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+          )}
+        >
+          Edit details
+        </Link>
+      </nav>
 
-          <div>
-            <h2 className="mb-2 font-display text-lg font-bold">Sale entries</h2>
-            {sale.soldItems.length === 0 ? (
-              <div className="rounded-md border border-dashed border-border p-6 text-center">
-                <p className="font-semibold">No sold items yet.</p>
-                <Button asChild variant="accent" className="mt-3">
-                  <Link href={`/sales/${sale.id}/quick-entry`}>Add first item</Link>
-                </Button>
-              </div>
-            ) : (
-              <ul className="space-y-2">
-                {sale.soldItems.map((item) => {
-                  const canEdit =
-                    canManageItem(user, item) || (isManager && item.isArchived);
-                  const canEditActive = canEdit && (isManager || !item.isArchived);
-                  return (
-                    <li
-                      key={item.id}
-                      className={`rounded-md border border-border bg-card p-3 shadow-sm ${
-                        item.isArchived ? "opacity-60" : ""
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="font-semibold leading-snug">
-                            {item.itemDescription}
-                          </div>
-                          <div className="mt-0.5 text-xs text-muted-foreground">
-                            {item.teamLabel ?? "No label"} · {item.submittedTeam.name}{" "}
-                            · {shortDate(item.createdAt)}
-                          </div>
-                        </div>
-                        <div className="price shrink-0 text-lg font-bold">
-                          {centsToDollars(item.finalSoldPriceCents)}
-                        </div>
-                      </div>
-
-                      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          {item.reportCategory ? (
-                            <Badge variant="secondary">{item.reportCategory.name}</Badge>
-                          ) : (
-                            <Badge variant="warning">Uncategorized</Badge>
-                          )}
-                          {isManager ? (
-                            <Badge
-                              variant={
-                                item.reviewStatus === ReviewStatus.APPROVED
-                                  ? "success"
-                                  : "warning"
-                              }
-                            >
-                              {item.reviewStatus === ReviewStatus.APPROVED
-                                ? "Approved"
-                                : "Needs review"}
-                            </Badge>
-                          ) : null}
-                          {item.isArchived ? <Badge variant="muted">Archived</Badge> : null}
-                        </div>
-
-                        {canEdit ? (
-                          <div className="ml-auto flex items-center gap-1.5">
-                            {canEditActive ? (
-                              <Button asChild variant="outline" size="sm">
-                                <Link href={`/items/${item.id}/edit`}>
-                                  <Edit3 aria-hidden="true" />
-                                  Edit
-                                </Link>
-                              </Button>
-                            ) : null}
-                            {canEdit && !item.isArchived ? (
-                              <form action={archiveSoldItemAction}>
-                                <input type="hidden" name="itemId" value={item.id} />
-                                <input
-                                  type="hidden"
-                                  name="next"
-                                  value={`/sales/${sale.id}`}
-                                />
-                                <Button type="submit" variant="ghost" size="sm">
-                                  <Archive aria-hidden="true" />
-                                  Archive
-                                </Button>
-                              </form>
-                            ) : null}
-                            {isManager && item.isArchived ? (
-                              <form action={restoreSoldItemAction}>
-                                <input type="hidden" name="itemId" value={item.id} />
-                                <input
-                                  type="hidden"
-                                  name="next"
-                                  value={`/sales/${sale.id}`}
-                                />
-                                <Button type="submit" variant="ghost" size="sm">
-                                  <RotateCcw aria-hidden="true" />
-                                  Restore
-                                </Button>
-                              </form>
-                            ) : null}
-                          </div>
-                        ) : null}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-        </section>
-
-        <aside className="space-y-4">
+      {activeView === "details" ? (
+        <section className="space-y-5" aria-labelledby="sale-details-heading">
           <Card>
             <CardHeader>
-              <CardTitle>Sale context</CardTitle>
+              <CardTitle id="sale-details-heading">Edit sale details</CardTitle>
+              <CardDescription>
+                {isManager
+                  ? "Update sale details, assignment, and status."
+                  : "Update details for this assigned sale."}
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <div>
-                <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                  Address
+            <CardContent>
+              <form
+                action={updateEstateSaleAction}
+                className="grid gap-4 sm:grid-cols-2"
+              >
+                <input type="hidden" name="saleId" value={sale.id} />
+                <div className="space-y-1.5">
+                  <Label htmlFor="saleName">Sale name</Label>
+                  <Input
+                    id="saleName"
+                    name="saleName"
+                    defaultValue={sale.saleName ?? ""}
+                  />
                 </div>
-                <div>{sale.addressRaw}</div>
-              </div>
-              <div>
-                <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                  Client
+                <div className="space-y-1.5">
+                  <Label htmlFor="clientName">Client name</Label>
+                  <Input
+                    id="clientName"
+                    name="clientName"
+                    defaultValue={sale.clientName ?? ""}
+                  />
                 </div>
-                <div>{sale.clientName ?? "Not set"}</div>
-              </div>
-              <div>
-                <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                  Dates
+                <div className="space-y-1.5">
+                  <Label htmlFor="startDate">Start</Label>
+                  <Input
+                    id="startDate"
+                    name="startDate"
+                    type="date"
+                    defaultValue={
+                      sale.startDate ? sale.startDate.toISOString().slice(0, 10) : ""
+                    }
+                  />
                 </div>
-                <div>
-                  {shortDate(sale.startDate)} – {shortDate(sale.endDate)}
+                <div className="space-y-1.5">
+                  <Label htmlFor="endDate">End</Label>
+                  <Input
+                    id="endDate"
+                    name="endDate"
+                    type="date"
+                    defaultValue={
+                      sale.endDate ? sale.endDate.toISOString().slice(0, 10) : ""
+                    }
+                  />
                 </div>
-              </div>
-              <div>
-                <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                  Created by
+                <div className="space-y-1.5">
+                  <Label htmlFor="reportThreshold">Report threshold</Label>
+                  <Input
+                    id="reportThreshold"
+                    name="reportThreshold"
+                    inputMode="decimal"
+                    className="price"
+                    defaultValue={centsToInput(sale.reportThresholdCents)}
+                  />
                 </div>
-                <div>
-                  {sale.createdByUser.name}
-                  {sale.createdByTeam ? `, ${sale.createdByTeam.name}` : ""}
-                </div>
-              </div>
-              {sale.notes ? (
-                <div>
-                  <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                    Notes
-                  </div>
-                  <div>{sale.notes}</div>
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
-
-          {isManager ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Edit sale details</CardTitle>
-                <CardDescription>
-                  Optional details can be filled in after logging starts.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form action={updateEstateSaleAction} className="space-y-3">
-                  <input type="hidden" name="saleId" value={sale.id} />
-                  <div className="space-y-1.5">
-                    <Label htmlFor="saleName">Sale name</Label>
-                    <Input
-                      id="saleName"
-                      name="saleName"
-                      defaultValue={sale.saleName ?? ""}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="clientName">Client name</Label>
-                    <Input
-                      id="clientName"
-                      name="clientName"
-                      defaultValue={sale.clientName ?? ""}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
+                {isManager ? (
+                  <>
                     <div className="space-y-1.5">
-                      <Label htmlFor="startDate">Start</Label>
-                      <Input
-                        id="startDate"
-                        name="startDate"
-                        type="date"
+                      <Label htmlFor="assignedTeamId">Assigned team</Label>
+                      <Select
+                        id="assignedTeamId"
+                        name="assignedTeamId"
                         defaultValue={
-                          sale.startDate
-                            ? sale.startDate.toISOString().slice(0, 10)
-                            : ""
+                          sale.assignedTeamId ? String(sale.assignedTeamId) : ""
                         }
-                      />
+                      >
+                        <option value="">No assigned team</option>
+                        {teams.map((team) => (
+                          <option key={team.id} value={team.id}>
+                            {team.name}
+                          </option>
+                        ))}
+                      </Select>
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="endDate">End</Label>
-                      <Input
-                        id="endDate"
-                        name="endDate"
-                        type="date"
-                        defaultValue={
-                          sale.endDate ? sale.endDate.toISOString().slice(0, 10) : ""
-                        }
-                      />
+                      <Label htmlFor="status">Status</Label>
+                      <Select id="status" name="status" defaultValue={sale.status}>
+                        <option value={SaleStatus.ACTIVE}>Active</option>
+                        <option value={SaleStatus.COMPLETED}>Completed</option>
+                        <option value={SaleStatus.ARCHIVED}>Archived</option>
+                      </Select>
                     </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="reportThreshold">Report threshold</Label>
-                    <Input
-                      id="reportThreshold"
-                      name="reportThreshold"
-                      inputMode="decimal"
-                      className="price"
-                      defaultValue={centsToInput(sale.reportThresholdCents)}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="assignedTeamId">Assigned team</Label>
-                    <Select
-                      id="assignedTeamId"
-                      name="assignedTeamId"
-                      defaultValue={
-                        sale.assignedTeamId ? String(sale.assignedTeamId) : ""
-                      }
-                    >
-                      <option value="">No assigned team</option>
-                      {teams.map((team) => (
-                        <option key={team.id} value={team.id}>
-                          {team.name}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="status">Status</Label>
-                    <Select id="status" name="status" defaultValue={sale.status}>
-                      <option value={SaleStatus.ACTIVE}>Active</option>
-                      <option value={SaleStatus.COMPLETED}>Completed</option>
-                      <option value={SaleStatus.ARCHIVED}>Archived</option>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="notes">Notes</Label>
-                    <Textarea id="notes" name="notes" defaultValue={sale.notes ?? ""} />
-                  </div>
-                  <Button type="submit" className="w-full">
+                  </>
+                ) : null}
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="notes">Notes</Label>
+                  <Textarea id="notes" name="notes" defaultValue={sale.notes ?? ""} />
+                </div>
+                <div className="sm:col-span-2">
+                  <Button type="submit" className="w-full sm:w-auto">
                     Save sale details
                   </Button>
-                </form>
-              </CardContent>
-            </Card>
-          ) : null}
+                </div>
+              </form>
+            </CardContent>
+          </Card>
 
           {isManager ? (
             <Card className="border-destructive/30">
@@ -436,38 +311,40 @@ export default async function SaleDetailPage({
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <form action={archiveEstateSaleAction}>
-                  <input type="hidden" name="saleId" value={sale.id} />
-                  <Button type="submit" variant="outline" className="w-full">
-                    {sale.status === SaleStatus.ARCHIVED ? (
-                      <>
-                        <RotateCcw aria-hidden="true" />
-                        Restore to active
-                      </>
-                    ) : (
-                      <>
-                        <Archive aria-hidden="true" />
-                        Archive sale
-                      </>
-                    )}
-                  </Button>
-                </form>
-                <form action={deleteEstateSaleAction}>
-                  <input type="hidden" name="saleId" value={sale.id} />
-                  <ConfirmButton
-                    type="submit"
-                    variant="destructive"
-                    className="w-full"
-                    confirmMessage={`Permanently delete this sale and its ${
-                      sale.soldItems.length
-                    } logged item${
-                      sale.soldItems.length === 1 ? "" : "s"
-                    }? This cannot be undone.`}
-                  >
-                    <Trash2 aria-hidden="true" />
-                    Delete sale permanently
-                  </ConfirmButton>
-                </form>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <form action={archiveEstateSaleAction}>
+                    <input type="hidden" name="saleId" value={sale.id} />
+                    <Button type="submit" variant="outline" className="w-full">
+                      {sale.status === SaleStatus.ARCHIVED ? (
+                        <>
+                          <RotateCcw aria-hidden="true" />
+                          Restore to active
+                        </>
+                      ) : (
+                        <>
+                          <Archive aria-hidden="true" />
+                          Archive sale
+                        </>
+                      )}
+                    </Button>
+                  </form>
+                  <form action={deleteEstateSaleAction}>
+                    <input type="hidden" name="saleId" value={sale.id} />
+                    <ConfirmButton
+                      type="submit"
+                      variant="destructive"
+                      className="w-full"
+                      confirmMessage={`Permanently delete this sale and its ${
+                        sale.soldItems.length
+                      } logged item${
+                        sale.soldItems.length === 1 ? "" : "s"
+                      }? This cannot be undone.`}
+                    >
+                      <Trash2 aria-hidden="true" />
+                      Delete sale permanently
+                    </ConfirmButton>
+                  </form>
+                </div>
                 <p className="text-xs text-muted-foreground">
                   Deleting removes the sale and all {sale.soldItems.length}{" "}
                   logged item{sale.soldItems.length === 1 ? "" : "s"}. Use
@@ -476,8 +353,184 @@ export default async function SaleDetailPage({
               </CardContent>
             </Card>
           ) : null}
-        </aside>
-      </div>
+        </section>
+      ) : (
+        <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
+          <section className="space-y-4">
+            <div className="grid grid-cols-2 gap-2">
+              <Stat label="Active" value={activeItems.length} />
+              <Stat label="Archived" value={archivedItems.length} />
+            </div>
+
+            <div>
+              <h2 className="mb-2 font-display text-lg font-bold">Sale entries</h2>
+              {sale.soldItems.length === 0 ? (
+                <div className="rounded-md border border-dashed border-border p-6 text-center">
+                  <p className="font-semibold">No sold items yet.</p>
+                  <Button asChild variant="accent" className="mt-3">
+                    <Link href={`/sales/${sale.id}/quick-entry`}>Add first item</Link>
+                  </Button>
+                </div>
+              ) : (
+                <ul className="space-y-2">
+                  {sale.soldItems.map((item) => {
+                    const canEdit = canEditSale;
+                    const canEditActive = canEdit && (isManager || !item.isArchived);
+                    return (
+                      <li
+                        key={item.id}
+                        className={`rounded-md border border-border bg-card p-3 shadow-sm ${
+                          item.isArchived ? "opacity-60" : ""
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="font-semibold leading-snug">
+                              {item.itemDescription}
+                            </div>
+                            <div className="mt-0.5 text-xs text-muted-foreground">
+                              Added {shortDate(item.createdAt)}
+                            </div>
+                          </div>
+                          <div className="price shrink-0 text-lg font-bold">
+                            {centsToDollars(item.finalSoldPriceCents)}
+                          </div>
+                        </div>
+
+                        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {item.isArchived ? (
+                              <Badge variant="muted">Archived</Badge>
+                            ) : null}
+                          </div>
+
+                          {canEdit ? (
+                            <div className="ml-auto flex items-center gap-1.5">
+                              {canEditActive ? (
+                                <Button asChild variant="outline" size="sm">
+                                  <Link href={`/items/${item.id}/edit`}>
+                                    <Edit3 aria-hidden="true" />
+                                    Edit
+                                  </Link>
+                                </Button>
+                              ) : null}
+                              {canEdit && !item.isArchived ? (
+                                <form action={archiveSoldItemAction}>
+                                  <input
+                                    type="hidden"
+                                    name="itemId"
+                                    value={item.id}
+                                  />
+                                  <input
+                                    type="hidden"
+                                    name="next"
+                                    value={`/sales/${sale.id}`}
+                                  />
+                                  <Button type="submit" variant="ghost" size="sm">
+                                    <Archive aria-hidden="true" />
+                                    Archive
+                                  </Button>
+                                </form>
+                              ) : null}
+                              {isManager && item.isArchived ? (
+                                <form action={restoreSoldItemAction}>
+                                  <input
+                                    type="hidden"
+                                    name="itemId"
+                                    value={item.id}
+                                  />
+                                  <input
+                                    type="hidden"
+                                    name="next"
+                                    value={`/sales/${sale.id}`}
+                                  />
+                                  <Button type="submit" variant="ghost" size="sm">
+                                    <RotateCcw aria-hidden="true" />
+                                    Restore
+                                  </Button>
+                                </form>
+                              ) : null}
+                              <form action={deleteSoldItemAction}>
+                                <input
+                                  type="hidden"
+                                  name="itemId"
+                                  value={item.id}
+                                />
+                                <input
+                                  type="hidden"
+                                  name="next"
+                                  value={`/sales/${sale.id}`}
+                                />
+                                <ConfirmButton
+                                  type="submit"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive hover:text-destructive"
+                                  confirmMessage={`Permanently delete "${item.itemDescription}"? This cannot be undone.`}
+                                >
+                                  <Trash2 aria-hidden="true" />
+                                  Delete
+                                </ConfirmButton>
+                              </form>
+                            </div>
+                          ) : null}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </section>
+
+          <aside className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Sale context</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div>
+                  <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                    Address
+                  </div>
+                  <div>{sale.addressRaw}</div>
+                </div>
+                <div>
+                  <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                    Client
+                  </div>
+                  <div>{sale.clientName ?? "Not set"}</div>
+                </div>
+                <div>
+                  <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                    Dates
+                  </div>
+                  <div>
+                    {shortDate(sale.startDate)} – {shortDate(sale.endDate)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                    Created by
+                  </div>
+                  <div>
+                    {sale.createdByUser.name}
+                    {sale.createdByTeam ? `, ${sale.createdByTeam.name}` : ""}
+                  </div>
+                </div>
+                {sale.notes ? (
+                  <div>
+                    <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                      Notes
+                    </div>
+                    <div>{sale.notes}</div>
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          </aside>
+        </div>
+      )}
     </AppShell>
   );
 }

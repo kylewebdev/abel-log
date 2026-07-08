@@ -11,10 +11,6 @@ export function normalizeAddress(address: string) {
     .replace(/\s+/g, " ");
 }
 
-export function normalizeAlias(value: string) {
-  return value.trim().toLowerCase().replace(/\s+/g, " ");
-}
-
 export function slugify(value: string) {
   return value
     .trim()
@@ -64,6 +60,28 @@ export function shortDate(value: Date | string | null | undefined) {
     day: "numeric",
     year: "numeric"
   }).format(new Date(value));
+}
+
+export function saleDateRange(sale: {
+  startDate: Date | string | null;
+  endDate: Date | string | null;
+}) {
+  if (sale.startDate && sale.endDate) {
+    const start = shortDate(sale.startDate);
+    const end = shortDate(sale.endDate);
+
+    return start === end ? start : `${start} - ${end}`;
+  }
+
+  if (sale.startDate) {
+    return `Starts ${shortDate(sale.startDate)}`;
+  }
+
+  if (sale.endDate) {
+    return `Ends ${shortDate(sale.endDate)}`;
+  }
+
+  return "Dates not set";
 }
 
 export function saleTitle(sale: { saleName: string | null; addressRaw: string }) {

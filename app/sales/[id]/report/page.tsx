@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { canManageSaleItems } from "@/lib/permissions";
 import { centsToDollars, saleTitle, shortDate } from "@/lib/format";
 import { AppShell } from "@/components/app-shell";
 import { SaleContextHeader } from "@/components/sale-context-header";
@@ -31,10 +32,6 @@ export default async function SaleReportPage({
     include: {
       assignedTeam: true,
       soldItems: {
-        include: {
-          reportCategory: true,
-          submittedTeam: true
-        },
         orderBy: {
           finalSoldPriceCents: "desc"
         }
@@ -46,10 +43,13 @@ export default async function SaleReportPage({
     notFound();
   }
 
+  if (!canManageSaleItems(user, sale)) {
+    redirect("/sales?error=permission");
+  }
+
   const paramsValue = (await searchParams) ?? {};
   const includeUnderThreshold = paramsValue.include_under_threshold === "true";
   const includeArchived = paramsValue.include_archived === "true";
-  const hideUncategorized = paramsValue.hide_uncategorized === "true";
 
   const filteredItems = sale.soldItems
     .filter((item) => includeArchived || !item.isArchived)
@@ -58,42 +58,7 @@ export default async function SaleReportPage({
         includeUnderThreshold ||
         item.finalSoldPriceCents >= sale.reportThresholdCents
     )
-    .filter((item) => !hideUncategorized || item.reportCategoryId !== null);
-
-  const groups = new Map<
-    string,
-    {
-      name: string;
-      sortOrder: number;
-      totalCents: number;
-      items: typeof filteredItems;
-    }
-  >();
-
-  for (const item of filteredItems) {
-    const name = item.reportCategory?.name ?? "Uncategorized";
-    const sortOrder = item.reportCategory?.sortOrder ?? 9999;
-    const group =
-      groups.get(name) ??
-      groups
-        .set(name, {
-          name,
-          sortOrder,
-          totalCents: 0,
-          items: []
-        })
-        .get(name)!;
-
-    group.totalCents += item.finalSoldPriceCents;
-    group.items.push(item);
-  }
-
-  const sortedGroups = [...groups.values()].sort((a, b) => {
-    if (a.sortOrder !== b.sortOrder) {
-      return a.sortOrder - b.sortOrder;
-    }
-    return a.name.localeCompare(b.name);
-  });
+    .sort((a, b) => b.finalSoldPriceCents - a.finalSoldPriceCents);
 
   const totalCents = filteredItems.reduce(
     (sum, item) => sum + item.finalSoldPriceCents,
@@ -107,9 +72,6 @@ export default async function SaleReportPage({
     }
     if (key === "include_archived" ? value : includeArchived) {
       query.set("include_archived", "true");
-    }
-    if (key === "hide_uncategorized" ? value : hideUncategorized) {
-      query.set("hide_uncategorized", "true");
     }
     const suffix = query.toString();
     return `/sales/${sale.id}/report${suffix ? `?${suffix}` : ""}`;
@@ -147,20 +109,16 @@ export default async function SaleReportPage({
         <CardContent className="flex flex-wrap items-end justify-between gap-4 p-4 sm:p-5">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
-              Grouped total
+              Report total
             </p>
             <p className="price text-4xl font-bold leading-none tracking-tight sm:text-5xl">
               {centsToDollars(totalCents)}
             </p>
           </div>
-          <div className="flex gap-5 text-sm">
+          <div className="text-sm">
             <div>
               <div className="price text-xl font-bold">{filteredItems.length}</div>
               <div className="text-xs text-muted-foreground">items</div>
-            </div>
-            <div>
-              <div className="price text-xl font-bold">{sortedGroups.length}</div>
-              <div className="text-xs text-muted-foreground">categories</div>
             </div>
           </div>
         </CardContent>
@@ -191,20 +149,11 @@ export default async function SaleReportPage({
               {includeArchived ? "Hide archived" : "Show archived"}
             </Link>
           </Button>
-          <Button
-            asChild
-            size="sm"
-            variant={hideUncategorized ? "secondary" : "outline"}
-          >
-            <Link href={toggleHref("hide_uncategorized", !hideUncategorized)}>
-              {hideUncategorized ? "Show uncategorized" : "Hide uncategorized"}
-            </Link>
-          </Button>
         </div>
         <PrintButton />
       </div>
 
-      {sortedGroups.length === 0 ? (
+      {filteredItems.length === 0 ? (
         <Card>
           <CardContent className="p-6 text-center">
             <p className="font-display text-lg font-bold">No report rows</p>
@@ -217,57 +166,36 @@ export default async function SaleReportPage({
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
-          {sortedGroups.map((group) => (
-            <Card
-              key={group.name}
-              className="overflow-hidden break-inside-avoid print:shadow-none"
-            >
-              <div className="flex items-center justify-between gap-3 border-b border-border bg-muted/40 px-4 py-2.5">
-                <div className="flex items-center gap-2">
-                  <h2 className="font-display text-base font-bold">{group.name}</h2>
-                  {group.name === "Uncategorized" ? (
-                    <Badge variant="warning">Needs cleanup</Badge>
-                  ) : null}
+        <Card className="overflow-hidden break-inside-avoid print:shadow-none">
+          <div className="flex items-center justify-between gap-3 border-b border-border bg-muted/40 px-4 py-2.5">
+            <h2 className="font-display text-base font-bold">Itemized list</h2>
+            <span className="text-xs text-muted-foreground">
+              Sorted highest to lowest
+            </span>
+          </div>
+          <ul className="divide-y divide-border">
+            {filteredItems.map((item) => (
+              <li
+                key={item.id}
+                className={`flex items-center justify-between gap-3 break-inside-avoid px-4 py-2.5 ${
+                  item.isArchived ? "opacity-60" : ""
+                }`}
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate font-medium">
+                      {item.itemDescription}
+                    </span>
+                    {item.isArchived ? <Badge variant="muted">Archived</Badge> : null}
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="price font-bold">
-                    {centsToDollars(group.totalCents)}
-                  </span>
-                  <span className="ml-1.5 text-xs text-muted-foreground">
-                    {group.items.length} item{group.items.length === 1 ? "" : "s"}
-                  </span>
-                </div>
-              </div>
-              <ul className="divide-y divide-border">
-                {group.items
-                  .slice()
-                  .sort((a, b) => b.finalSoldPriceCents - a.finalSoldPriceCents)
-                  .map((item) => (
-                    <li
-                      key={item.id}
-                      className={`flex items-center justify-between gap-3 break-inside-avoid px-4 py-2.5 ${
-                        item.isArchived ? "opacity-60" : ""
-                      }`}
-                    >
-                      <div className="min-w-0">
-                        <div className="truncate font-medium">
-                          {item.itemDescription}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {item.submittedTeam.name}
-                          {item.isArchived ? " · archived" : ""}
-                        </div>
-                      </div>
-                      <span className="price shrink-0 font-bold">
-                        {centsToDollars(item.finalSoldPriceCents)}
-                      </span>
-                    </li>
-                  ))}
-              </ul>
-            </Card>
-          ))}
-        </div>
+                <span className="price shrink-0 font-bold">
+                  {centsToDollars(item.finalSoldPriceCents)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
       )}
     </AppShell>
   );

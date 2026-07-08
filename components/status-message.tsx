@@ -7,7 +7,6 @@ const messages: Record<string, string> = {
   duplicate:
     "An active sale already exists for this address — opened the existing one.",
   updated: "Changes saved.",
-  aliasSaved: "Alias saved for future category suggestions.",
   archived: "Sale archived — hidden from the active list.",
   restored: "Sale restored to the active list.",
   deleted: "Sale deleted."

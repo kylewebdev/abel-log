@@ -3,10 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  ClipboardCheck,
   Home,
   Inbox,
-  Tags,
   type LucideIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -24,8 +22,6 @@ const TEAM_NAV: NavItem[] = [
 
 const MANAGEMENT_NAV: NavItem[] = [
   { href: "/sales", label: "Sales", icon: Home },
-  { href: "/management/review", label: "Review", icon: ClipboardCheck },
-  { href: "/management/categories", label: "Tags", icon: Tags },
   { href: "/team/recent", label: "Recent", icon: Inbox }
 ];
 

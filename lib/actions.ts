@@ -1,9 +1,7 @@
 "use server";
 
 import {
-  AliasScope,
   EntrySource,
-  ReviewStatus,
   Role,
   SaleStatus
 } from "@prisma/client";
@@ -14,13 +12,11 @@ import { prisma } from "@/lib/db";
 import {
   dollarsToCents,
   normalizeAddress,
-  normalizeAlias,
   optionalString,
-  parseDateInput,
-  slugify
+  parseDateInput
 } from "@/lib/format";
 import { requireManagement, requireUser } from "@/lib/auth";
-import { canManageItem } from "@/lib/permissions";
+import { canManageItem, canManageSaleItems } from "@/lib/permissions";
 import { signIn, signOut } from "@/auth";
 
 const DEFAULT_REDIRECT = "/sales";
@@ -28,10 +24,6 @@ const DEFAULT_REDIRECT = "/sales";
 function formId(value: FormDataEntryValue | null) {
   const id = Number(value);
   return Number.isInteger(id) && id > 0 ? id : null;
-}
-
-function aliasKey(scope: AliasScope, normalizedAliasText: string, teamId: number | null) {
-  return `${scope}:${teamId ?? "global"}:${normalizedAliasText}`;
 }
 
 async function recordActivity({
@@ -100,6 +92,10 @@ export async function createEstateSaleAction(formData: FormData) {
     redirect("/sales/new?error=address");
   }
 
+  if (user.role === Role.TEAM && !user.teamId) {
+    redirect("/sales/new?error=team");
+  }
+
   const normalizedAddress = normalizeAddress(address);
   const googlePlaceId = optionalString(formData.get("googlePlaceId"));
 
@@ -159,7 +155,7 @@ export async function createEstateSaleAction(formData: FormData) {
 }
 
 export async function updateEstateSaleAction(formData: FormData) {
-  const user = await requireManagement();
+  const user = await requireUser();
   const saleId = formId(formData.get("saleId"));
 
   if (!saleId) {
@@ -169,9 +165,20 @@ export async function updateEstateSaleAction(formData: FormData) {
   const before = await prisma.estateSale.findUniqueOrThrow({
     where: { id: saleId }
   });
+
+  if (!canManageSaleItems(user, before)) {
+    redirect(`/sales/${saleId}?error=permission`);
+  }
+
   const reportThresholdCents =
     dollarsToCents(formData.get("reportThreshold")) ?? before.reportThresholdCents;
-  const status = optionalString(formData.get("status")) as SaleStatus | null;
+  const requestedStatus = optionalString(formData.get("status")) as SaleStatus | null;
+  const status =
+    user.role === Role.MANAGEMENT &&
+    requestedStatus &&
+    requestedStatus in SaleStatus
+      ? requestedStatus
+      : before.status;
 
   const after = await prisma.estateSale.update({
     where: { id: saleId },
@@ -182,9 +189,17 @@ export async function updateEstateSaleAction(formData: FormData) {
       reportThresholdCents,
       startDate: parseDateInput(formData.get("startDate")),
       endDate: parseDateInput(formData.get("endDate")),
-      assignedTeamId: formId(formData.get("assignedTeamId")),
-      status: status && status in SaleStatus ? status : before.status,
-      archivedAt: status === SaleStatus.ARCHIVED ? new Date() : null
+      assignedTeamId:
+        user.role === Role.MANAGEMENT
+          ? formId(formData.get("assignedTeamId"))
+          : before.assignedTeamId,
+      status,
+      archivedAt:
+        user.role === Role.MANAGEMENT
+          ? status === SaleStatus.ARCHIVED
+            ? before.archivedAt ?? new Date()
+            : null
+          : before.archivedAt
     }
   });
 
@@ -275,81 +290,23 @@ export async function deleteEstateSaleAction(formData: FormData) {
   redirect("/sales?deleted=1");
 }
 
-async function resolveSubmittedTeamId({
+async function requireSaleItemAccess({
   user,
-  saleId,
-  formData
+  saleId
 }: {
   user: Awaited<ReturnType<typeof requireUser>>;
   saleId: number;
-  formData: FormData;
 }) {
-  if (user.role === Role.TEAM && user.teamId) {
-    return user.teamId;
-  }
-
-  const requestedTeamId = formId(formData.get("submittedTeamId"));
-  if (requestedTeamId) {
-    return requestedTeamId;
-  }
-
   const sale = await prisma.estateSale.findUniqueOrThrow({
     where: { id: saleId },
     select: { assignedTeamId: true }
   });
 
-  if (sale.assignedTeamId) {
-    return sale.assignedTeamId;
+  if (!canManageSaleItems(user, sale)) {
+    redirect(`/sales/${saleId}?error=permission`);
   }
 
-  const firstTeam = await prisma.team.findFirst({
-    where: { isActive: true },
-    orderBy: { name: "asc" }
-  });
-
-  if (!firstTeam) {
-    throw new Error("At least one active team is required before adding items.");
-  }
-
-  return firstTeam.id;
-}
-
-async function categoryFromApprovedAlias(teamLabel: string | null, teamId: number) {
-  if (!teamLabel) {
-    return null;
-  }
-
-  const normalized = normalizeAlias(teamLabel);
-  const aliases = await prisma.categoryAlias.findMany({
-    where: {
-      normalizedAliasText: normalized,
-      isApproved: true,
-      OR: [
-        {
-          scope: AliasScope.GLOBAL,
-          teamId: null
-        },
-        {
-          scope: AliasScope.TEAM,
-          teamId
-        }
-      ]
-    },
-    orderBy: [{ scope: "desc" }, { usageCount: "desc" }]
-  });
-
-  const alias = aliases.find((item) => item.teamId === teamId) ?? aliases[0];
-
-  if (!alias) {
-    return null;
-  }
-
-  await prisma.categoryAlias.update({
-    where: { id: alias.id },
-    data: { usageCount: { increment: 1 } }
-  });
-
-  return alias.reportCategoryId;
+  return sale;
 }
 
 export async function createSoldItemAction(formData: FormData) {
@@ -362,11 +319,8 @@ export async function createSoldItemAction(formData: FormData) {
     redirect(saleId ? `/sales/${saleId}/quick-entry?error=missing` : "/sales");
   }
 
-  const submittedTeamId = await resolveSubmittedTeamId({ user, saleId, formData });
-  const teamLabel = optionalString(formData.get("teamLabel"));
-  const requestedCategoryId = formId(formData.get("reportCategoryId"));
-  const suggestedCategoryId =
-    requestedCategoryId ?? (await categoryFromApprovedAlias(teamLabel, submittedTeamId));
+  await requireSaleItemAccess({ user, saleId });
+
   const source =
     optionalString(formData.get("entrySource")) === "PAPER"
       ? EntrySource.PAPER
@@ -377,14 +331,10 @@ export async function createSoldItemAction(formData: FormData) {
   const item = await prisma.soldItem.create({
     data: {
       estateSaleId: saleId,
-      submittedTeamId,
       createdByUserId: user.id,
       itemDescription: description,
       finalSoldPriceCents: priceCents,
-      teamLabel,
-      reportCategoryId: suggestedCategoryId,
       entrySource: source,
-      reviewStatus: ReviewStatus.NEEDS_REVIEW,
       soldDate: new Date()
     }
   });
@@ -401,7 +351,6 @@ export async function createSoldItemAction(formData: FormData) {
   revalidatePath(`/sales/${saleId}`);
   revalidatePath(`/sales/${saleId}/report`);
   revalidatePath("/team/recent");
-  revalidatePath("/management/review");
 
   const intent = optionalString(formData.get("intent"));
   if (intent === "save") {
@@ -419,46 +368,32 @@ export async function createBatchItemsAction(formData: FormData) {
     redirect("/sales");
   }
 
-  const submittedTeamId = await resolveSubmittedTeamId({ user, saleId, formData });
+  await requireSaleItemAccess({ user, saleId });
+
   const descriptions = formData.getAll("description[]");
   const prices = formData.getAll("price[]");
-  const labels = formData.getAll("teamLabel[]");
-  const notes = formData.getAll("notes[]");
 
-  const rows = await Promise.all(
-    descriptions.map(async (rawDescription, index) => {
-      const description = optionalString(rawDescription);
-      const priceCents = dollarsToCents(prices[index] ?? null);
-      const teamLabel = optionalString(labels[index] ?? null);
-      const rowNotes = optionalString(notes[index] ?? null);
+  const rows = descriptions.map((rawDescription, index) => {
+    const description = optionalString(rawDescription);
+    const priceCents = dollarsToCents(prices[index] ?? null);
 
-      if (!description && priceCents === null && !teamLabel && !rowNotes) {
-        return null;
-      }
+    if (!description && priceCents === null) {
+      return null;
+    }
 
-      if (!description || priceCents === null) {
-        return null;
-      }
+    if (!description || priceCents === null) {
+      return null;
+    }
 
-      const aliasCategoryId = await categoryFromApprovedAlias(
-        teamLabel,
-        submittedTeamId
-      );
-
-      return {
-        estateSaleId: saleId,
-        submittedTeamId,
-        createdByUserId: user.id,
-        itemDescription: rowNotes ? `${description} (${rowNotes})` : description,
-        finalSoldPriceCents: priceCents,
-        teamLabel,
-        reportCategoryId: aliasCategoryId,
-        entrySource: EntrySource.PAPER,
-        reviewStatus: ReviewStatus.NEEDS_REVIEW,
-        soldDate: new Date()
-      };
-    })
-  );
+    return {
+      estateSaleId: saleId,
+      createdByUserId: user.id,
+      itemDescription: description,
+      finalSoldPriceCents: priceCents,
+      entrySource: EntrySource.PAPER,
+      soldDate: new Date()
+    };
+  });
 
   const validRows = rows.filter((row): row is NonNullable<typeof row> => Boolean(row));
 
@@ -480,7 +415,6 @@ export async function createBatchItemsAction(formData: FormData) {
   revalidatePath(`/sales/${saleId}`);
   revalidatePath(`/sales/${saleId}/report`);
   revalidatePath("/team/recent");
-  revalidatePath("/management/review");
   redirect(`/sales/${saleId}?batchSaved=${validRows.length}`);
 }
 
@@ -493,7 +427,12 @@ export async function updateSoldItemAction(formData: FormData) {
   }
 
   const before = await prisma.soldItem.findUniqueOrThrow({
-    where: { id: itemId }
+    where: { id: itemId },
+    include: {
+      estateSale: {
+        select: { assignedTeamId: true }
+      }
+    }
   });
 
   if (!canManageItem(user, before) || (user.role === Role.TEAM && before.isArchived)) {
@@ -507,23 +446,11 @@ export async function updateSoldItemAction(formData: FormData) {
     redirect(`/items/${itemId}/edit?error=missing`);
   }
 
-  const requestedCategoryId =
-    user.role === Role.MANAGEMENT ? formId(formData.get("reportCategoryId")) : before.reportCategoryId;
-
-  const reviewStatus =
-    user.role === Role.MANAGEMENT &&
-    optionalString(formData.get("reviewStatus")) === ReviewStatus.APPROVED
-      ? ReviewStatus.APPROVED
-      : before.reviewStatus;
-
   const after = await prisma.soldItem.update({
     where: { id: itemId },
     data: {
       itemDescription: description,
-      finalSoldPriceCents: priceCents,
-      teamLabel: optionalString(formData.get("teamLabel")),
-      reportCategoryId: requestedCategoryId,
-      reviewStatus
+      finalSoldPriceCents: priceCents
     }
   });
 
@@ -540,7 +467,6 @@ export async function updateSoldItemAction(formData: FormData) {
   revalidatePath(`/sales/${before.estateSaleId}`);
   revalidatePath(`/sales/${before.estateSaleId}/report`);
   revalidatePath("/team/recent");
-  revalidatePath("/management/review");
 
   const next = optionalString(formData.get("next")) ?? `/sales/${before.estateSaleId}`;
   redirect(next);
@@ -556,7 +482,12 @@ export async function archiveSoldItemAction(formData: FormData) {
   }
 
   const before = await prisma.soldItem.findUniqueOrThrow({
-    where: { id: itemId }
+    where: { id: itemId },
+    include: {
+      estateSale: {
+        select: { assignedTeamId: true }
+      }
+    }
   });
 
   if (!canManageItem(user, before)) {
@@ -586,14 +517,13 @@ export async function archiveSoldItemAction(formData: FormData) {
   revalidatePath(`/sales/${before.estateSaleId}`);
   revalidatePath(`/sales/${before.estateSaleId}/report`);
   revalidatePath("/team/recent");
-  revalidatePath("/management/review");
   redirect(next);
 }
 
 export async function restoreSoldItemAction(formData: FormData) {
   const user = await requireManagement();
   const itemId = formId(formData.get("itemId"));
-  const next = optionalString(formData.get("next")) ?? "/management/review?filter=archived";
+  const next = optionalString(formData.get("next")) ?? "/team/recent";
 
   if (!itemId) {
     redirect(next);
@@ -624,112 +554,47 @@ export async function restoreSoldItemAction(formData: FormData) {
 
   revalidatePath(`/sales/${before.estateSaleId}`);
   revalidatePath(`/sales/${before.estateSaleId}/report`);
-  revalidatePath("/management/review");
+  revalidatePath("/team/recent");
   redirect(next);
 }
 
-export async function approveSoldItemAction(formData: FormData) {
-  const user = await requireManagement();
+export async function deleteSoldItemAction(formData: FormData) {
+  const user = await requireUser();
   const itemId = formId(formData.get("itemId"));
-  const categoryId = formId(formData.get("reportCategoryId"));
-  const next = optionalString(formData.get("next")) ?? "/management/review";
+  const next = optionalString(formData.get("next")) ?? DEFAULT_REDIRECT;
 
   if (!itemId) {
     redirect(next);
   }
 
   const before = await prisma.soldItem.findUniqueOrThrow({
-    where: { id: itemId }
-  });
-
-  const after = await prisma.soldItem.update({
     where: { id: itemId },
-    data: {
-      reportCategoryId: categoryId ?? before.reportCategoryId,
-      reviewStatus: ReviewStatus.APPROVED
+    include: {
+      estateSale: {
+        select: { assignedTeamId: true }
+      }
     }
   });
+
+  if (!canManageItem(user, before)) {
+    redirect(`/sales/${before.estateSaleId}?error=permission`);
+  }
+
+  await prisma.soldItem.delete({ where: { id: itemId } });
 
   await recordActivity({
     actorUserId: user.id,
     actorTeamId: user.teamId,
     entityType: "sold_item",
     entityId: itemId,
-    action: "approve",
-    before,
-    after
+    action: "delete",
+    before
   });
 
   revalidatePath(`/sales/${before.estateSaleId}`);
   revalidatePath(`/sales/${before.estateSaleId}/report`);
-  revalidatePath("/management/review");
+  revalidatePath("/team/recent");
   redirect(next);
-}
-
-export async function createCategoryAction(formData: FormData) {
-  await requireManagement();
-  const name = optionalString(formData.get("name"));
-
-  if (!name) {
-    redirect("/management/categories?error=category");
-  }
-
-  await prisma.reportCategory.upsert({
-    where: { slug: slugify(name) },
-    update: {
-      name,
-      isActive: true
-    },
-    create: {
-      name,
-      slug: slugify(name),
-      isActive: true
-    }
-  });
-
-  revalidatePath("/management/categories");
-  redirect("/management/categories?created=1");
-}
-
-export async function createAliasAction(formData: FormData) {
-  const user = await requireManagement();
-  const aliasText = optionalString(formData.get("aliasText"));
-  const categoryId = formId(formData.get("reportCategoryId"));
-  const teamId = formId(formData.get("teamId"));
-  const scope = teamId ? AliasScope.TEAM : AliasScope.GLOBAL;
-  const next = optionalString(formData.get("next")) ?? "/management/categories";
-
-  if (!aliasText || !categoryId) {
-    redirect(`${next}${next.includes("?") ? "&" : "?"}error=alias`);
-  }
-
-  const normalized = normalizeAlias(aliasText);
-
-  await prisma.categoryAlias.upsert({
-    where: { aliasKey: aliasKey(scope, normalized, teamId) },
-    update: {
-      aliasText,
-      reportCategoryId: categoryId,
-      isApproved: true,
-      approvedByUserId: user.id,
-      approvedAt: new Date()
-    },
-    create: {
-      aliasKey: aliasKey(scope, normalized, teamId),
-      aliasText,
-      normalizedAliasText: normalized,
-      reportCategoryId: categoryId,
-      teamId,
-      scope,
-      isApproved: true,
-      approvedByUserId: user.id,
-      approvedAt: new Date()
-    }
-  });
-
-  revalidatePath("/management/categories");
-  revalidatePath("/management/review");
-  redirect(`${next}${next.includes("?") ? "&" : "?"}aliasSaved=1`);
 }
 
 export async function quickArchiveOwnItemAction(formData: FormData) {

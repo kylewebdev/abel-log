@@ -1,7 +1,7 @@
-import { notFound } from "next/navigation";
-import { Role } from "@prisma/client";
+import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { canManageSaleItems } from "@/lib/permissions";
 import { AppShell } from "@/components/app-shell";
 import { SaleContextHeader } from "@/components/sale-context-header";
 import { BatchEntryForm } from "@/components/batch-entry-form";
@@ -19,16 +19,17 @@ export default async function BatchEntryPage({
     notFound();
   }
 
-  const [sale, teams] = await Promise.all([
-    prisma.estateSale.findUnique({
-      where: { id: saleId },
-      include: { assignedTeam: true }
-    }),
-    prisma.team.findMany({ where: { isActive: true }, orderBy: { name: "asc" } })
-  ]);
+  const sale = await prisma.estateSale.findUnique({
+    where: { id: saleId },
+    include: { assignedTeam: true }
+  });
 
   if (!sale) {
     notFound();
+  }
+
+  if (!canManageSaleItems(user, sale)) {
+    redirect(`/sales/${sale.id}?error=permission`);
   }
 
   return (
@@ -47,12 +48,7 @@ export default async function BatchEntryPage({
         </p>
       </div>
 
-      <BatchEntryForm
-        saleId={sale.id}
-        teams={teams}
-        showTeamPicker={user.role === Role.MANAGEMENT}
-        defaultTeamId={sale.assignedTeamId}
-      />
+      <BatchEntryForm saleId={sale.id} />
     </AppShell>
   );
 }
