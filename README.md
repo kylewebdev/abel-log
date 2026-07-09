@@ -2,7 +2,7 @@
 
 Working MVP for the estate sale sold-item logging workflow described in `PRD.md`.
 
-This is a small internal business app built with Next.js App Router, TypeScript, Tailwind, shadcn-style local UI primitives, Prisma, and SQLite for local development. The Prisma schema keeps the data model portable for a later move to Postgres or a hosted database.
+This is a small internal business app built with Next.js App Router, TypeScript, Tailwind, shadcn-style local UI primitives, Prisma, and PostgreSQL.
 
 ## What Is Built
 
@@ -13,8 +13,8 @@ This is a small internal business app built with Next.js App Router, TypeScript,
 - Team-owned estate sales: team-created sales are assigned to that team; management can assign any active team.
 - Quick sold-item entry for one item at a time.
 - Batch paper-note entry for rush-hour handwritten sheets.
-- Team ownership permissions: teams see and edit entries only for sales assigned to their team.
-- Management permissions: assign teams, edit sales, and manage entries across all teams.
+- Team ownership permissions: teams access assigned sales and edit/archive only entries originally submitted by their team.
+- Management permissions: assign teams, edit sales, restore entries, and permanently delete entries across all teams.
 - Entries can be edited, archived, restored by management, or permanently deleted.
 - Flat itemized sale report that defaults to non-archived items at or above the sale threshold, sorted by price.
 
@@ -36,13 +36,14 @@ Square integration, POS features, payment tracking, customer tracking, OCR, phot
    cp .env.example .env
    ```
 
-3. Create and migrate the SQLite database:
+3. Create a local PostgreSQL database named `abel_log`, then apply migrations:
 
    ```bash
    npm run db:migrate
    ```
 
-4. Seed sample data:
+4. To create disposable local demo data, set `ENABLE_DEMO_SEED=true` in
+   `.env`, then run:
 
    ```bash
    npm run db:seed
@@ -56,32 +57,27 @@ Square integration, POS features, payment tracking, customer tracking, OCR, phot
 
 6. Open [http://localhost:3000](http://localhost:3000).
 
-## Seeded Logins
+## Demo Logins
 
-Seeded accounts use phone-friendly passwords with `916abel` as the shared
-prefix. ABEL stands for Attic to Basement Estate Liquidators.
+The seed creates `management` and `team-a` through `team-e`. It generates a
+random password for each newly created account and prints those passwords once.
+You may instead configure the optional `SEED_PASSWORD_*` values shown in
+`.env.example`; configured passwords must contain at least 12 characters.
 
-| Account | Username | Password |
-| --- | --- | --- |
-| Management | `management` | `916abel0000` |
-| Team A | `team-a` | `916abel1111` |
-| Team B | `team-b` | `916abel2222` |
-| Team C | `team-c` | `916abel3333` |
-| Team D | `team-d` | `916abel4444` |
-| Team E | `team-e` | `916abel5555` |
+The seed never changes passwords or reactivates existing accounts, refuses to
+run without the explicit demo flag, and refuses to run in production.
 
 ## Useful Commands
 
 ```bash
 npm run dev          # Start the local Next.js app
-npm run db:migrate   # Prepare SQLite and apply Prisma migrations
-npm run db:seed      # Seed teams, users, and sample sale data
+npm test             # Run authorization and business-rule tests
+npm run db:migrate   # Apply migrations to the configured PostgreSQL database
+npm run db:seed      # Seed disposable local demo data (explicit opt-in required)
 npm run lint         # Run ESLint
 npm run typecheck    # Run TypeScript checks
 npm run build        # Generate Prisma Client and build the app
 ```
-
-The local SQLite database is `prisma/dev.db` and is ignored by git.
 
 ## Core Workflow
 

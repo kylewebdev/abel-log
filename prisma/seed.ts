@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import {
   EntrySource,
   PrismaClient,
@@ -9,116 +10,144 @@ import { hashPassword } from "../lib/password";
 
 const prisma = new PrismaClient();
 
-const seededPasswords: Record<string, string> = {
-  management: "916abel0000",
-  "team-a": "916abel1111",
-  "team-b": "916abel2222",
-  "team-c": "916abel3333",
-  "team-d": "916abel4444",
-  "team-e": "916abel5555"
+type CreatedCredential = {
+  username: string;
+  password: string;
 };
 
+const createdCredentials: CreatedCredential[] = [];
+
+function assertDemoSeedAllowed() {
+  if (process.env.ENABLE_DEMO_SEED !== "true") {
+    throw new Error(
+      "Refusing to seed: set ENABLE_DEMO_SEED=true only for a disposable local database."
+    );
+  }
+
+  if (
+    process.env.NODE_ENV === "production" ||
+    process.env.VERCEL_ENV === "production"
+  ) {
+    throw new Error("Refusing to seed a production environment.");
+  }
+}
+
+function passwordEnvironmentKey(username: string) {
+  return `SEED_PASSWORD_${username.replace(/-/g, "_").toUpperCase()}`;
+}
+
+function newAccountPassword(username: string) {
+  const configuredPassword = process.env[passwordEnvironmentKey(username)]?.trim();
+
+  if (configuredPassword && configuredPassword.length < 12) {
+    throw new Error(
+      `${passwordEnvironmentKey(username)} must contain at least 12 characters.`
+    );
+  }
+
+  return configuredPassword || randomBytes(18).toString("base64url");
+}
+
+async function ensureUser({
+  name,
+  username,
+  role,
+  teamId
+}: {
+  name: string;
+  username: string;
+  role: Role;
+  teamId: number | null;
+}) {
+  const existing = await prisma.user.findUnique({ where: { username } });
+
+  if (existing) {
+    return existing;
+  }
+
+  const password = newAccountPassword(username);
+  const user = await prisma.user.create({
+    data: {
+      name,
+      username,
+      passwordHash: await hashPassword(password),
+      role,
+      teamId,
+      isActive: true
+    }
+  });
+
+  createdCredentials.push({ username, password });
+  return user;
+}
+
 async function main() {
-  const teams = await Promise.all(
-    ["Team A", "Team B", "Team C", "Team D", "Team E"].map((name) =>
-      prisma.team.upsert({
+  assertDemoSeedAllowed();
+
+  const teams = [];
+  for (const name of ["Team A", "Team B", "Team C", "Team D", "Team E"]) {
+    teams.push(
+      await prisma.team.upsert({
         where: { slug: slugify(name) },
-        update: { name, isActive: true },
+        update: { name },
         create: {
           name,
           slug: slugify(name),
           isActive: true
         }
       })
-    )
-  );
-
-  await prisma.user.upsert({
-    where: { username: "management" },
-    update: {
-      name: "Management",
-      passwordHash: await hashPassword(seededPasswords.management),
-      role: Role.MANAGEMENT,
-      teamId: null,
-      isActive: true
-    },
-    create: {
-      name: "Management",
-      username: "management",
-      passwordHash: await hashPassword(seededPasswords.management),
-      role: Role.MANAGEMENT,
-      isActive: true
-    }
-  });
-
-  for (const team of teams) {
-    const passwordHash = await hashPassword(seededPasswords[team.slug]);
-
-    await prisma.user.upsert({
-      where: { username: team.slug },
-      update: {
-        name: team.name,
-        passwordHash,
-        role: Role.TEAM,
-        teamId: team.id,
-        isActive: true
-      },
-      create: {
-        name: team.name,
-        username: team.slug,
-        passwordHash,
-        role: Role.TEAM,
-        teamId: team.id,
-        isActive: true
-      }
-    });
+    );
   }
 
-  const management = await prisma.user.findUniqueOrThrow({
-    where: { username: "management" }
+  const management = await ensureUser({
+    name: "Management",
+    username: "management",
+    role: Role.MANAGEMENT,
+    teamId: null
   });
-  const teamAUser = await prisma.user.findUniqueOrThrow({
-    where: { username: "team-a" }
-  });
+
+  const teamUsers = new Map<string, Awaited<ReturnType<typeof ensureUser>>>();
+  for (const team of teams) {
+    teamUsers.set(
+      team.slug,
+      await ensureUser({
+        name: team.name,
+        username: team.slug,
+        role: Role.TEAM,
+        teamId: team.id
+      })
+    );
+  }
+
   const teamA = teams[0];
-
-  const sale = await prisma.estateSale.upsert({
-    where: { id: 1 },
-    update: {
-      addressRaw: "123 Main St, Sacramento, CA",
-      formattedAddress: "123 Main St, Sacramento, CA",
-      normalizedAddress: normalizeAddress("123 Main St, Sacramento, CA"),
-      saleName: "Johnson Estate",
-      clientName: "Johnson Family",
-      status: SaleStatus.ACTIVE,
-      reportThresholdCents: 2500,
-      assignedTeamId: teamA.id,
-      createdByUserId: management.id,
-      createdByTeamId: null
-    },
-    create: {
-      addressRaw: "123 Main St, Sacramento, CA",
-      formattedAddress: "123 Main St, Sacramento, CA",
-      normalizedAddress: normalizeAddress("123 Main St, Sacramento, CA"),
-      saleName: "Johnson Estate",
-      clientName: "Johnson Family",
-      notes: "Sample active sale for local testing.",
-      status: SaleStatus.ACTIVE,
-      reportThresholdCents: 2500,
-      assignedTeamId: teamA.id,
-      createdByUserId: management.id
-    }
+  const teamAUser = teamUsers.get("team-a");
+  const sampleAddress = "123 Main St, Sacramento, CA";
+  const existingSampleSale = await prisma.estateSale.findFirst({
+    where: { normalizedAddress: normalizeAddress(sampleAddress) },
+    select: { id: true }
   });
 
-  const existingItems = await prisma.soldItem.count({
-    where: { estateSaleId: sale.id }
-  });
+  if (!existingSampleSale && teamA && teamAUser) {
+    const sale = await prisma.estateSale.create({
+      data: {
+        addressRaw: sampleAddress,
+        formattedAddress: sampleAddress,
+        normalizedAddress: normalizeAddress(sampleAddress),
+        saleName: "Johnson Estate",
+        clientName: "Johnson Family",
+        notes: "Sample active sale for local testing.",
+        status: SaleStatus.ACTIVE,
+        reportThresholdCents: 2500,
+        assignedTeamId: teamA.id,
+        createdByUserId: management.id
+      }
+    });
 
-  if (existingItems === 0) {
     await prisma.soldItem.createMany({
       data: [
         {
           estateSaleId: sale.id,
+          submittedTeamId: teamA.id,
           createdByUserId: teamAUser.id,
           itemDescription: "Dining table",
           finalSoldPriceCents: 25000,
@@ -126,6 +155,7 @@ async function main() {
         },
         {
           estateSaleId: sale.id,
+          submittedTeamId: teamA.id,
           createdByUserId: teamAUser.id,
           itemDescription: "Box of hand tools",
           finalSoldPriceCents: 4500,
@@ -133,6 +163,7 @@ async function main() {
         },
         {
           estateSaleId: sale.id,
+          submittedTeamId: teamA.id,
           createdByUserId: teamAUser.id,
           itemDescription: "Framed painting",
           finalSoldPriceCents: 6500,
@@ -140,6 +171,7 @@ async function main() {
         },
         {
           estateSaleId: sale.id,
+          submittedTeamId: teamA.id,
           createdByUserId: teamAUser.id,
           itemDescription: "Small kitchen utensils",
           finalSoldPriceCents: 1800,
@@ -147,6 +179,16 @@ async function main() {
         }
       ]
     });
+  }
+
+  if (createdCredentials.length === 0) {
+    console.log("Demo accounts already exist; passwords were left unchanged.");
+    return;
+  }
+
+  console.log("Created demo accounts (store these passwords securely):");
+  for (const credential of createdCredentials) {
+    console.log(`${credential.username}: ${credential.password}`);
   }
 }
 

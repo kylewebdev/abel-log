@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { canManageSaleItems } from "@/lib/permissions";
+import { canAccessSale } from "@/lib/permissions";
 import { centsToDollars, saleTitle, shortDate } from "@/lib/format";
 import { AppShell } from "@/components/app-shell";
 import { SaleContextHeader } from "@/components/sale-context-header";
@@ -43,7 +43,7 @@ export default async function SaleReportPage({
     notFound();
   }
 
-  if (!canManageSaleItems(user, sale)) {
+  if (!canAccessSale(user, sale)) {
     redirect("/sales?error=permission");
   }
 

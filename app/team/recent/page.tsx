@@ -8,7 +8,7 @@ import {
   deleteSoldItemAction,
   restoreSoldItemAction
 } from "@/lib/actions";
-import { canManageItem } from "@/lib/permissions";
+import { canDeleteItem, canManageItem } from "@/lib/permissions";
 import { centsToDollars, saleTitle, shortDate } from "@/lib/format";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
@@ -18,13 +18,12 @@ import { ConfirmButton } from "@/components/confirm-button";
 export default async function TeamRecentPage() {
   const user = await requireUser();
   const isManager = user.role === Role.MANAGEMENT;
+  const mayDeleteItems = canDeleteItem(user);
   const items = await prisma.soldItem.findMany({
     where: isManager
       ? {}
       : {
-          estateSale: {
-            assignedTeamId: user.teamId ?? -1
-          }
+          submittedTeamId: user.teamId ?? -1
         },
     include: {
       estateSale: true
@@ -47,7 +46,7 @@ export default async function TeamRecentPage() {
         <p className="mt-1 text-sm text-muted-foreground">
           {isManager
             ? "Edit, archive, restore, or delete recently submitted rows across sales."
-            : "Edit, archive, or delete entries for your team's assigned sales. Archived rows stay for context."}
+            : "Edit or archive your team's entries while the sale remains assigned to your team. Archived rows stay for context."}
         </p>
       </div>
 
@@ -122,20 +121,22 @@ export default async function TeamRecentPage() {
                           </Button>
                         </form>
                       ) : null}
-                      <form action={deleteSoldItemAction}>
-                        <input type="hidden" name="itemId" value={item.id} />
-                        <input type="hidden" name="next" value="/team/recent" />
-                        <ConfirmButton
-                          type="submit"
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          confirmMessage={`Permanently delete "${item.itemDescription}"? This cannot be undone.`}
-                        >
-                          <Trash2 aria-hidden="true" />
-                          Delete
-                        </ConfirmButton>
-                      </form>
+                      {mayDeleteItems ? (
+                        <form action={deleteSoldItemAction}>
+                          <input type="hidden" name="itemId" value={item.id} />
+                          <input type="hidden" name="next" value="/team/recent" />
+                          <ConfirmButton
+                            type="submit"
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            confirmMessage={`Permanently delete "${item.itemDescription}"? This cannot be undone.`}
+                          >
+                            <Trash2 aria-hidden="true" />
+                            Delete
+                          </ConfirmButton>
+                        </form>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>

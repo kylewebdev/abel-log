@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { Plus, History } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { canManageSaleItems } from "@/lib/permissions";
+import { canAccessSale } from "@/lib/permissions";
 import { createSoldItemAction } from "@/lib/actions";
 import { centsToDollars } from "@/lib/format";
 import { AppShell } from "@/components/app-shell";
@@ -46,7 +46,7 @@ export default async function QuickEntryPage({
     notFound();
   }
 
-  if (!canManageSaleItems(user, sale)) {
+  if (!canAccessSale(user, sale)) {
     redirect(`/sales/${sale.id}?error=permission`);
   }
 

@@ -21,7 +21,12 @@ import {
   restoreSoldItemAction,
   updateEstateSaleAction
 } from "@/lib/actions";
-import { canManageSaleItems } from "@/lib/permissions";
+import {
+  canAccessSale,
+  canDeleteItem,
+  canEditSale,
+  canManageItem
+} from "@/lib/permissions";
 import { centsToDollars, centsToInput, saleTitle, shortDate } from "@/lib/format";
 import { AppShell } from "@/components/app-shell";
 import { StatusMessage } from "@/components/status-message";
@@ -94,14 +99,16 @@ export default async function SaleDetailPage({
   const paramsValue = (await searchParams) ?? {};
   const isManager = user.role === Role.MANAGEMENT;
 
-  if (!canManageSaleItems(user, sale)) {
+  if (!canAccessSale(user, sale)) {
     redirect("/sales?error=permission");
   }
 
-  const canEditSale = canManageSaleItems(user, sale);
+  const mayEditSale = canEditSale(user);
+  const mayDeleteItems = canDeleteItem(user);
   const activeItems = sale.soldItems.filter((item) => !item.isArchived);
   const archivedItems = sale.soldItems.filter((item) => item.isArchived);
-  const activeView = paramsValue.view === "details" ? "details" : "entries";
+  const activeView =
+    mayEditSale && paramsValue.view === "details" ? "details" : "entries";
   const entriesHref = `/sales/${sale.id}`;
   const detailsHref = `/sales/${sale.id}?view=details`;
 
@@ -138,7 +145,7 @@ export default async function SaleDetailPage({
 
       {paramsValue.error === "permission" ? (
         <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-sm font-semibold text-destructive">
-          Teams can edit entries only for sales assigned to their team.
+          Teams can edit only their own entries on sales currently assigned to their team.
         </div>
       ) : null}
 
@@ -165,7 +172,10 @@ export default async function SaleDetailPage({
       </div>
 
       <nav
-        className="mb-5 grid grid-cols-2 overflow-hidden rounded-lg border border-border bg-card p-1 shadow-sm"
+        className={cn(
+          "mb-5 grid overflow-hidden rounded-lg border border-border bg-card p-1 shadow-sm",
+          mayEditSale ? "grid-cols-2" : "grid-cols-1"
+        )}
         aria-label="Sale view"
       >
         <Link
@@ -180,18 +190,20 @@ export default async function SaleDetailPage({
         >
           Entries
         </Link>
-        <Link
-          href={detailsHref}
-          aria-current={activeView === "details" ? "page" : undefined}
-          className={cn(
-            "focus-ring rounded-md px-3 py-2 text-center text-sm font-bold transition-colors",
-            activeView === "details"
-              ? "bg-primary text-primary-foreground shadow-sm"
-              : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
-          )}
-        >
-          Edit details
-        </Link>
+        {mayEditSale ? (
+          <Link
+            href={detailsHref}
+            aria-current={activeView === "details" ? "page" : undefined}
+            className={cn(
+              "focus-ring rounded-md px-3 py-2 text-center text-sm font-bold transition-colors",
+              activeView === "details"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+            )}
+          >
+            Edit details
+          </Link>
+        ) : null}
       </nav>
 
       {activeView === "details" ? (
@@ -200,9 +212,7 @@ export default async function SaleDetailPage({
             <CardHeader>
               <CardTitle id="sale-details-heading">Edit sale details</CardTitle>
               <CardDescription>
-                {isManager
-                  ? "Update sale details, assignment, and status."
-                  : "Update details for this assigned sale."}
+                Update sale details, assignment, and status.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -374,7 +384,10 @@ export default async function SaleDetailPage({
               ) : (
                 <ul className="space-y-2">
                   {sale.soldItems.map((item) => {
-                    const canEdit = canEditSale;
+                    const canEdit = canManageItem(user, {
+                      submittedTeamId: item.submittedTeamId,
+                      estateSale: sale
+                    });
                     const canEditActive = canEdit && (isManager || !item.isArchived);
                     return (
                       <li
@@ -450,28 +463,30 @@ export default async function SaleDetailPage({
                                   </Button>
                                 </form>
                               ) : null}
-                              <form action={deleteSoldItemAction}>
-                                <input
-                                  type="hidden"
-                                  name="itemId"
-                                  value={item.id}
-                                />
-                                <input
-                                  type="hidden"
-                                  name="next"
-                                  value={`/sales/${sale.id}`}
-                                />
-                                <ConfirmButton
-                                  type="submit"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-destructive hover:text-destructive"
-                                  confirmMessage={`Permanently delete "${item.itemDescription}"? This cannot be undone.`}
-                                >
-                                  <Trash2 aria-hidden="true" />
-                                  Delete
-                                </ConfirmButton>
-                              </form>
+                              {mayDeleteItems ? (
+                                <form action={deleteSoldItemAction}>
+                                  <input
+                                    type="hidden"
+                                    name="itemId"
+                                    value={item.id}
+                                  />
+                                  <input
+                                    type="hidden"
+                                    name="next"
+                                    value={`/sales/${sale.id}`}
+                                  />
+                                  <ConfirmButton
+                                    type="submit"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-destructive hover:text-destructive"
+                                    confirmMessage={`Permanently delete "${item.itemDescription}"? This cannot be undone.`}
+                                  >
+                                    <Trash2 aria-hidden="true" />
+                                    Delete
+                                  </ConfirmButton>
+                                </form>
+                              ) : null}
                             </div>
                           ) : null}
                         </div>

@@ -16,7 +16,7 @@ import {
   parseDateInput
 } from "@/lib/format";
 import { requireManagement, requireUser } from "@/lib/auth";
-import { canManageItem, canManageSaleItems } from "@/lib/permissions";
+import { canAccessSale, canManageItem } from "@/lib/permissions";
 import { signIn, signOut } from "@/auth";
 
 const DEFAULT_REDIRECT = "/sales";
@@ -155,7 +155,7 @@ export async function createEstateSaleAction(formData: FormData) {
 }
 
 export async function updateEstateSaleAction(formData: FormData) {
-  const user = await requireUser();
+  const user = await requireManagement();
   const saleId = formId(formData.get("saleId"));
 
   if (!saleId) {
@@ -166,18 +166,13 @@ export async function updateEstateSaleAction(formData: FormData) {
     where: { id: saleId }
   });
 
-  if (!canManageSaleItems(user, before)) {
-    redirect(`/sales/${saleId}?error=permission`);
-  }
-
   const reportThresholdCents =
     dollarsToCents(formData.get("reportThreshold")) ?? before.reportThresholdCents;
-  const requestedStatus = optionalString(formData.get("status")) as SaleStatus | null;
+  const requestedStatus = optionalString(formData.get("status"));
   const status =
-    user.role === Role.MANAGEMENT &&
     requestedStatus &&
-    requestedStatus in SaleStatus
-      ? requestedStatus
+    Object.values(SaleStatus).includes(requestedStatus as SaleStatus)
+      ? (requestedStatus as SaleStatus)
       : before.status;
 
   const after = await prisma.estateSale.update({
@@ -189,17 +184,10 @@ export async function updateEstateSaleAction(formData: FormData) {
       reportThresholdCents,
       startDate: parseDateInput(formData.get("startDate")),
       endDate: parseDateInput(formData.get("endDate")),
-      assignedTeamId:
-        user.role === Role.MANAGEMENT
-          ? formId(formData.get("assignedTeamId"))
-          : before.assignedTeamId,
+      assignedTeamId: formId(formData.get("assignedTeamId")),
       status,
       archivedAt:
-        user.role === Role.MANAGEMENT
-          ? status === SaleStatus.ARCHIVED
-            ? before.archivedAt ?? new Date()
-            : null
-          : before.archivedAt
+        status === SaleStatus.ARCHIVED ? before.archivedAt ?? new Date() : null
     }
   });
 
@@ -302,7 +290,7 @@ async function requireSaleItemAccess({
     select: { assignedTeamId: true }
   });
 
-  if (!canManageSaleItems(user, sale)) {
+  if (!canAccessSale(user, sale)) {
     redirect(`/sales/${saleId}?error=permission`);
   }
 
@@ -331,6 +319,7 @@ export async function createSoldItemAction(formData: FormData) {
   const item = await prisma.soldItem.create({
     data: {
       estateSaleId: saleId,
+      submittedTeamId: user.role === Role.TEAM ? user.teamId : null,
       createdByUserId: user.id,
       itemDescription: description,
       finalSoldPriceCents: priceCents,
@@ -387,6 +376,7 @@ export async function createBatchItemsAction(formData: FormData) {
 
     return {
       estateSaleId: saleId,
+      submittedTeamId: user.role === Role.TEAM ? user.teamId : null,
       createdByUserId: user.id,
       itemDescription: description,
       finalSoldPriceCents: priceCents,
@@ -559,7 +549,7 @@ export async function restoreSoldItemAction(formData: FormData) {
 }
 
 export async function deleteSoldItemAction(formData: FormData) {
-  const user = await requireUser();
+  const user = await requireManagement();
   const itemId = formId(formData.get("itemId"));
   const next = optionalString(formData.get("next")) ?? DEFAULT_REDIRECT;
 
@@ -575,10 +565,6 @@ export async function deleteSoldItemAction(formData: FormData) {
       }
     }
   });
-
-  if (!canManageItem(user, before)) {
-    redirect(`/sales/${before.estateSaleId}?error=permission`);
-  }
 
   await prisma.soldItem.delete({ where: { id: itemId } });
 

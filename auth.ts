@@ -1,5 +1,6 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import { Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { verifyPassword } from "@/lib/password";
 
@@ -35,10 +36,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
 
         const user = await prisma.user.findFirst({
-          where: { username, isActive: true }
+          where: { username, isActive: true },
+          include: { team: true }
         });
 
-        if (!user || !(await verifyPassword(password, user.passwordHash))) {
+        if (
+          !user ||
+          (user.role === Role.TEAM && !user.team?.isActive) ||
+          !(await verifyPassword(password, user.passwordHash))
+        ) {
           return null;
         }
 

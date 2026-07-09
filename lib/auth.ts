@@ -17,7 +17,7 @@ export async function getCurrentUser() {
     return null;
   }
 
-  return prisma.user.findFirst({
+  const user = await prisma.user.findFirst({
     where: {
       id: userId,
       isActive: true
@@ -26,6 +26,12 @@ export async function getCurrentUser() {
       team: true
     }
   });
+
+  if (user?.role === Role.TEAM && !user.team?.isActive) {
+    return null;
+  }
+
+  return user;
 }
 
 export async function requireUser() {

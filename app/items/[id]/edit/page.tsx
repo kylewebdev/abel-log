@@ -10,7 +10,7 @@ import {
   restoreSoldItemAction,
   updateSoldItemAction
 } from "@/lib/actions";
-import { canManageItem } from "@/lib/permissions";
+import { canDeleteItem, canManageItem } from "@/lib/permissions";
 import { centsToInput, saleTitle } from "@/lib/format";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
@@ -46,6 +46,7 @@ export default async function EditItemPage({
   }
 
   const isManager = user.role === Role.MANAGEMENT;
+  const mayDeleteItem = canDeleteItem(user);
 
   if (!canManageItem(user, item) || (!isManager && item.isArchived)) {
     redirect(`/sales/${item.estateSaleId}?error=permission`);
@@ -141,18 +142,20 @@ export default async function EditItemPage({
               </Button>
             </form>
           ) : null}
-          <form action={deleteSoldItemAction}>
-            <input type="hidden" name="itemId" value={item.id} />
-            <input type="hidden" name="next" value={`/sales/${item.estateSaleId}`} />
-            <ConfirmButton
-              type="submit"
-              variant="destructive"
-              confirmMessage={`Permanently delete "${item.itemDescription}"? This cannot be undone.`}
-            >
-              <Trash2 aria-hidden="true" />
-              Delete item permanently
-            </ConfirmButton>
-          </form>
+          {mayDeleteItem ? (
+            <form action={deleteSoldItemAction}>
+              <input type="hidden" name="itemId" value={item.id} />
+              <input type="hidden" name="next" value={`/sales/${item.estateSaleId}`} />
+              <ConfirmButton
+                type="submit"
+                variant="destructive"
+                confirmMessage={`Permanently delete "${item.itemDescription}"? This cannot be undone.`}
+              >
+                <Trash2 aria-hidden="true" />
+                Delete item permanently
+              </ConfirmButton>
+            </form>
+          ) : null}
         </div>
       </div>
 

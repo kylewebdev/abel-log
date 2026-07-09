@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { canManageSaleItems } from "@/lib/permissions";
+import { canAccessSale } from "@/lib/permissions";
 import { AppShell } from "@/components/app-shell";
 import { SaleContextHeader } from "@/components/sale-context-header";
 import { BatchEntryForm } from "@/components/batch-entry-form";
@@ -28,7 +28,7 @@ export default async function BatchEntryPage({
     notFound();
   }
 
-  if (!canManageSaleItems(user, sale)) {
+  if (!canAccessSale(user, sale)) {
     redirect(`/sales/${sale.id}?error=permission`);
   }
 

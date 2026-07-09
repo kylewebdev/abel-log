@@ -32,6 +32,7 @@ model Team {
   slug               String          @unique
   isActive           Boolean         @default(true)
   users              User[]
+  submittedSoldItems SoldItem[]      @relation("SubmittedTeam")
   createdEstateSales EstateSale[]    @relation("CreatedByTeam")
   assignedSales      EstateSale[]    @relation("AssignedTeam")
   activityLogs       ActivityLog[]
@@ -97,6 +98,8 @@ model SoldItem {
   id                 Int             @id @default(autoincrement())
   estateSaleId       Int
   estateSale         EstateSale      @relation(fields: [estateSaleId], references: [id])
+  submittedTeamId    Int?
+  submittedTeam      Team?           @relation("SubmittedTeam", fields: [submittedTeamId], references: [id])
   createdByUserId    Int
   createdByUser      User            @relation("CreatedByUser", fields: [createdByUserId], references: [id])
   itemDescription    String
@@ -112,6 +115,7 @@ model SoldItem {
   updatedAt          DateTime        @updatedAt
 
   @@index([estateSaleId, isArchived])
+  @@index([submittedTeamId])
 }
 
 model ActivityLog {
