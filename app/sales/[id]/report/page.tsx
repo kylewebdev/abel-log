@@ -86,7 +86,7 @@ export default async function SaleReportPage({
       {/* Client-facing letterhead — shown only in print / PDF exports. */}
       <div className="mb-4 hidden print:block">
         <p className="stamp text-[0.7rem] text-muted-foreground">
-          Estate Sale Report
+          items sold for 25 or greater
         </p>
         <h1 className="font-display text-2xl font-extrabold tracking-tight">
           {saleTitle(sale)}
@@ -166,8 +166,8 @@ export default async function SaleReportPage({
           </CardContent>
         </Card>
       ) : (
-        <Card className="overflow-hidden break-inside-avoid print:shadow-none">
-          <div className="flex items-center justify-between gap-3 border-b border-border bg-muted/40 px-4 py-2.5">
+        <Card className="overflow-hidden print:overflow-visible print:shadow-none">
+          <div className="flex items-center justify-between gap-3 border-b border-border bg-muted/40 px-4 py-2.5 print:break-after-avoid-page">
             <h2 className="font-display text-base font-bold">Itemized list</h2>
             <span className="text-xs text-muted-foreground">
               Sorted highest to lowest

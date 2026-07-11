@@ -135,26 +135,46 @@
    Element-level hiding and page-break control live on the components via
    Tailwind `print:` / `break-inside-avoid` utilities. */
 @media print {
-  /* Zero page margin so the browser defaults to "no margins" and omits its
-     own header/footer (URL, date, page numbers). The report keeps a
-     comfortable inner margin via padding on <main> instead of edge-to-edge. */
+  /* Page margins repeat around every printed sheet, so a list can fragment
+     naturally without rows touching the physical page edge. */
   @page {
-    margin: 0;
+    margin: 1.2cm 1.3cm;
+  }
+
+  :root {
+    color-scheme: light;
+    --background: oklch(100% 0 0deg);
+    --foreground: oklch(15% 0 0deg);
+    --card: oklch(100% 0 0deg);
+    --card-foreground: var(--foreground);
+    --muted: oklch(100% 0 0deg);
+    --muted-foreground: oklch(35% 0 0deg);
+    --border: oklch(68% 0 0deg);
   }
 
   body {
-    background: #fff !important;
+    background: oklch(100% 0 0deg) !important;
+    color: oklch(15% 0 0deg) !important;
   }
 
   main {
-    padding: 1.2cm 1.3cm !important;
+    padding: 0 !important;
   }
 
-  /* Render report fills, badges, and rules faithfully in the exported PDF. */
+  /* Favor economical monochrome output: keep structure, omit decorative ink. */
   *,
   *::before,
   *::after {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+    background-color: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    -webkit-print-color-adjust: economy;
+    print-color-adjust: economy;
+  }
+
+  .perforated {
+    height: 0;
+    border-top: 1px dashed var(--border);
   }
 }
