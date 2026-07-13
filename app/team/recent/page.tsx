@@ -18,7 +18,6 @@ import { ConfirmButton } from "@/components/confirm-button";
 export default async function TeamRecentPage() {
   const user = await requireUser();
   const isManager = user.role === Role.MANAGEMENT;
-  const mayDeleteItems = canDeleteItem(user);
   const items = await prisma.soldItem.findMany({
     where: isManager
       ? {}
@@ -46,7 +45,7 @@ export default async function TeamRecentPage() {
         <p className="mt-1 text-sm text-muted-foreground">
           {isManager
             ? "Edit, archive, restore, or delete recently submitted rows across sales."
-            : "Edit or archive your team's entries while the sale remains assigned to your team. Archived rows stay for context."}
+            : "Edit, archive, or delete your team's entries while the sale remains assigned to your team. Archived rows stay for context."}
         </p>
       </div>
 
@@ -59,6 +58,7 @@ export default async function TeamRecentPage() {
           {items.map((item) => {
             const canManage = canManageItem(user, item);
             const canEdit = canManage && (isManager || !item.isArchived);
+            const canDelete = canDeleteItem(user, item);
 
             return (
               <li
@@ -121,7 +121,7 @@ export default async function TeamRecentPage() {
                           </Button>
                         </form>
                       ) : null}
-                      {mayDeleteItems ? (
+                      {canDelete ? (
                         <form action={deleteSoldItemAction}>
                           <input type="hidden" name="itemId" value={item.id} />
                           <input type="hidden" name="next" value="/team/recent" />

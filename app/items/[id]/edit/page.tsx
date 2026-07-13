@@ -46,7 +46,7 @@ export default async function EditItemPage({
   }
 
   const isManager = user.role === Role.MANAGEMENT;
-  const mayDeleteItem = canDeleteItem(user);
+  const mayDeleteItem = canDeleteItem(user, item);
 
   if (!canManageItem(user, item) || (!isManager && item.isArchived)) {
     redirect(`/sales/${item.estateSaleId}?error=permission`);

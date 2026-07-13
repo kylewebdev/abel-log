@@ -13,7 +13,7 @@ This is a small internal business app built with Next.js App Router, TypeScript,
 - Team-owned estate sales: team-created sales are assigned to that team; management can assign any active team.
 - Quick sold-item entry for one item at a time.
 - Batch paper-note entry for rush-hour handwritten sheets.
-- Team ownership permissions: teams access assigned sales and edit/archive only entries originally submitted by their team.
+- Team ownership permissions: teams access assigned sales and edit, archive, or delete only entries originally submitted by their team.
 - Management permissions: assign teams, edit sales, restore entries, and permanently delete entries across all teams.
 - Entries can be edited, archived, restored by management, or permanently deleted.
 - Flat itemized sale report that defaults to non-archived items at or above the sale threshold, sorted by price.

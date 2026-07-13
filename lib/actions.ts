@@ -16,7 +16,11 @@ import {
   parseDateInput
 } from "@/lib/format";
 import { requireManagement, requireUser } from "@/lib/auth";
-import { canAccessSale, canManageItem } from "@/lib/permissions";
+import {
+  canAccessSale,
+  canDeleteItem,
+  canManageItem
+} from "@/lib/permissions";
 import { signIn, signOut } from "@/auth";
 
 const DEFAULT_REDIRECT = "/sales";
@@ -549,7 +553,7 @@ export async function restoreSoldItemAction(formData: FormData) {
 }
 
 export async function deleteSoldItemAction(formData: FormData) {
-  const user = await requireManagement();
+  const user = await requireUser();
   const itemId = formId(formData.get("itemId"));
   const next = optionalString(formData.get("next")) ?? DEFAULT_REDIRECT;
 
@@ -565,6 +569,10 @@ export async function deleteSoldItemAction(formData: FormData) {
       }
     }
   });
+
+  if (!canDeleteItem(user, before)) {
+    redirect(`/sales/${before.estateSaleId}?error=permission`);
+  }
 
   await prisma.soldItem.delete({ where: { id: itemId } });
 

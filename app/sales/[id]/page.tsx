@@ -104,7 +104,6 @@ export default async function SaleDetailPage({
   }
 
   const mayEditSale = canEditSale(user);
-  const mayDeleteItems = canDeleteItem(user);
   const activeItems = sale.soldItems.filter((item) => !item.isArchived);
   const archivedItems = sale.soldItems.filter((item) => item.isArchived);
   const activeView =
@@ -145,7 +144,7 @@ export default async function SaleDetailPage({
 
       {paramsValue.error === "permission" ? (
         <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-sm font-semibold text-destructive">
-          Teams can edit only their own entries on sales currently assigned to their team.
+          Teams can edit, archive, or delete only their own entries on sales currently assigned to their team.
         </div>
       ) : null}
 
@@ -384,10 +383,12 @@ export default async function SaleDetailPage({
               ) : (
                 <ul className="space-y-2">
                   {sale.soldItems.map((item) => {
-                    const canEdit = canManageItem(user, {
+                    const ownedItem = {
                       submittedTeamId: item.submittedTeamId,
                       estateSale: sale
-                    });
+                    };
+                    const canEdit = canManageItem(user, ownedItem);
+                    const canDelete = canDeleteItem(user, ownedItem);
                     const canEditActive = canEdit && (isManager || !item.isArchived);
                     return (
                       <li
@@ -463,7 +464,7 @@ export default async function SaleDetailPage({
                                   </Button>
                                 </form>
                               ) : null}
-                              {mayDeleteItems ? (
+                              {canDelete ? (
                                 <form action={deleteSoldItemAction}>
                                   <input
                                     type="hidden"

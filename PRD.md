@@ -101,12 +101,12 @@ Team users can:
 * Add sold item entries.
 * Edit items submitted by their own team.
 * Archive items submitted by their own team.
+* Permanently delete items submitted by their own team.
 * View their recently submitted items.
 
 Team users cannot:
 
 * Edit another team’s submitted items.
-* Permanently delete items.
 * Finalize reports.
 * Edit global category rules.
 * Restore archived entries unless explicitly allowed later.
@@ -391,13 +391,15 @@ Instead:
 
 ---
 
-## 10. Entry Status and Archiving
+## 10. Entry Status, Deletion, and Archiving
 
-### 10.1 No Hard Delete
+### 10.1 Deletion
 
-Do not permanently delete sold item entries from normal app workflows.
+Teams can permanently delete entries submitted by their own team while the sale remains assigned to them. Management can permanently delete any entry.
 
-Teams should be able to archive their own entries.
+Deletion must always be authorized against the entry's submitting team, even if an entry from another team is visible.
+
+Teams should also be able to archive their own entries.
 
 Management should be able to archive and restore any entry.
 
@@ -525,13 +527,14 @@ Team users can:
 * Add items to any active sale.
 * Edit items submitted by their own team.
 * Archive items submitted by their own team.
+* Permanently delete items submitted by their own team.
 
 Team users cannot:
 
 * Edit items submitted by another team.
 * Archive items submitted by another team.
+* Permanently delete items submitted by another team.
 * Restore archived entries unless allowed later.
-* Permanently delete entries.
 * Manage categories globally.
 * Approve/finalize client reports.
 
@@ -543,6 +546,7 @@ Management users can:
 * Create/edit/archive estate sales.
 * Edit all item entries.
 * Archive/restore all item entries.
+* Permanently delete all item entries.
 * Manage report categories.
 * Manage category aliases.
 * Review and approve entries.
@@ -956,7 +960,18 @@ Archived entries:
 * Kept in database.
 * Visible through archive filters.
 
-### 15.6 Reporting
+### 15.6 Deletion
+
+Team users:
+
+* Can permanently delete their own team's entries while the sale is assigned to their team.
+* Cannot permanently delete another team's entries.
+
+Management users:
+
+* Can permanently delete all entries.
+
+### 15.7 Reporting
 
 Default report filters:
 
@@ -1105,7 +1120,8 @@ Adapt as needed to the chosen framework.
 * A team user can edit their own team’s entries.
 * A team user cannot edit another team’s entries.
 * A team user can archive their own entries.
-* A team user cannot permanently delete entries.
+* A team user can permanently delete their own entries.
+* A team user cannot permanently delete another team’s entries.
 
 ### Management Review
 
@@ -1139,7 +1155,7 @@ Build:
 7. Quick item entry.
 8. Batch paper-note entry.
 9. Team-only editing permissions.
-10. Archive instead of delete.
+10. Team-owned archiving and deletion.
 11. Management review queue.
 12. Report categories.
 13. Team label and alias structure.

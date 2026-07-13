@@ -9,12 +9,14 @@ type AssignedSale = {
   assignedTeamId: number | null;
 };
 
+type TeamOwnedItem = {
+  submittedTeamId: number | null;
+  estateSale: AssignedSale;
+};
+
 export function canManageItem(
   user: AppUser,
-  item: {
-    submittedTeamId: number | null;
-    estateSale: AssignedSale;
-  }
+  item: TeamOwnedItem
 ) {
   return (
     user.role === Role.MANAGEMENT ||
@@ -38,6 +40,6 @@ export function canEditSale(user: AppUser) {
   return user.role === Role.MANAGEMENT;
 }
 
-export function canDeleteItem(user: AppUser) {
-  return user.role === Role.MANAGEMENT;
+export function canDeleteItem(user: AppUser, item: TeamOwnedItem) {
+  return canManageItem(user, item);
 }
