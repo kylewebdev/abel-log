@@ -44,7 +44,7 @@ export default async function BatchEntryPage({
           Enter the handwritten sheet
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          One row per item or bundle. Blank and incomplete rows are skipped.
+          Add several sold items at once. Only complete items will be saved.
         </p>
       </div>
 

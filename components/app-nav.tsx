@@ -39,29 +39,31 @@ function useIsActive() {
   };
 }
 
-/** Desktop: inline nav inside the top bar. Hidden on mobile (the tab bar
- *  takes over there — see {@link MobileTabBar}). */
+/** The sales-list link stays in the top bar at every viewport so focus screens
+ *  still have an escape route. Secondary links move to the mobile tab bar. */
 export function AppNav({ role }: { role: string }) {
   const items = navItems(role);
   const isActive = useIsActive();
 
   return (
-    <nav className="hidden items-center gap-1 md:flex">
+    <nav className="flex items-center gap-1" aria-label="Primary">
       {items.map((item) => {
         const active = isActive(item.href);
         return (
           <Link
             key={item.href}
             href={item.href}
+            aria-current={active ? "page" : undefined}
             className={cn(
               "inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition-colors",
+              item.href !== "/sales" && "hidden md:inline-flex",
               active
                 ? "bg-foreground/5 text-foreground"
                 : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
             )}
           >
             <item.icon className="size-4" aria-hidden="true" />
-            {item.label}
+            <span>{item.href === "/sales" ? "All sales" : item.label}</span>
           </Link>
         );
       })}

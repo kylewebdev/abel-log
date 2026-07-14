@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Archive, ArrowLeft, RotateCcw, Save, Trash2 } from "lucide-react";
+import { Archive, RotateCcw, Save, Trash2 } from "lucide-react";
 import { Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmButton } from "@/components/confirm-button";
+import { Breadcrumbs } from "@/components/breadcrumbs";
 
 export default async function EditItemPage({
   params,
@@ -61,13 +62,17 @@ export default async function EditItemPage({
   return (
     <AppShell user={user} focus>
       <div className="mx-auto max-w-2xl">
-        <Link
-          href={next}
-          className="focus-ring -ml-1 mb-3 inline-flex items-center gap-1.5 rounded-md px-1 text-sm font-semibold text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" aria-hidden="true" />
-          Back
-        </Link>
+        <Breadcrumbs
+          items={[
+            { label: "All sales", href: "/sales" },
+            {
+              label: saleTitle(item.estateSale),
+              href: `/sales/${item.estateSaleId}`
+            },
+            { label: "Edit item" }
+          ]}
+          className="-ml-1 mb-3"
+        />
 
         <div className="mb-4 flex items-center gap-2">
           <Badge variant={item.isArchived ? "muted" : "secondary"}>

@@ -44,6 +44,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfirmButton } from "@/components/confirm-button";
+import { Breadcrumbs } from "@/components/breadcrumbs";
 import { cn } from "@/lib/utils";
 
 function Stat({ label, value }: { label: string; value: number }) {
@@ -113,12 +114,13 @@ export default async function SaleDetailPage({
 
   return (
     <AppShell user={user}>
-      <Link
-        href="/sales"
-        className="focus-ring -ml-1 mb-2 inline-flex items-center gap-1.5 rounded-md px-1 text-sm font-semibold text-muted-foreground hover:text-foreground"
-      >
-        Sales
-      </Link>
+      <Breadcrumbs
+        items={[
+          { label: "All sales", href: "/sales" },
+          { label: saleTitle(sale) }
+        ]}
+        className="-ml-1 mb-2"
+      />
 
       <div className="mb-4">
         <div className="mb-1.5 flex flex-wrap items-center gap-1.5">

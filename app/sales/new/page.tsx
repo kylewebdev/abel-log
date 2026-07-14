@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { ArrowLeft, MapPin, Plus } from "lucide-react";
+import { MapPin, Plus } from "lucide-react";
 import { Role } from "@prisma/client";
 import { createEstateSaleAction } from "@/lib/actions";
 import { requireUser } from "@/lib/auth";
@@ -10,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
+import { Breadcrumbs } from "@/components/breadcrumbs";
 
 export default async function NewSalePage({
   searchParams
@@ -27,13 +27,13 @@ export default async function NewSalePage({
   return (
     <AppShell user={user} focus>
       <div className="mx-auto max-w-2xl">
-        <Link
-          href="/sales"
-          className="focus-ring -ml-1 mb-3 inline-flex items-center gap-1.5 rounded-md px-1 text-sm font-semibold text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" aria-hidden="true" />
-          Back to sales
-        </Link>
+        <Breadcrumbs
+          items={[
+            { label: "All sales", href: "/sales" },
+            { label: "New sale" }
+          ]}
+          className="-ml-1 mb-3"
+        />
 
         <p className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
           New estate sale
