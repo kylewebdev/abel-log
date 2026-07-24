@@ -21,6 +21,10 @@ import {
   canDeleteItem,
   canManageItem
 } from "@/lib/permissions";
+import {
+  isReportGroupColor,
+  reportGroupColor
+} from "@/lib/report-groups";
 import { signIn, signOut } from "@/auth";
 
 const DEFAULT_REDIRECT = "/sales";
@@ -210,6 +214,153 @@ export async function updateEstateSaleAction(formData: FormData) {
   redirect(`/sales/${saleId}?updated=1`);
 }
 
+function revalidateSaleGroupPaths(saleId: number) {
+  revalidatePath(`/sales/${saleId}`);
+  revalidatePath(`/sales/${saleId}/quick-entry`);
+  revalidatePath(`/sales/${saleId}/batch`);
+  revalidatePath(`/sales/${saleId}/report`);
+}
+
+export async function createReportGroupAction(formData: FormData) {
+  const user = await requireManagement();
+  const saleId = formId(formData.get("saleId"));
+  const color = optionalString(formData.get("color"));
+  const requestedName = optionalString(formData.get("name"));
+
+  if (!saleId || !color || !isReportGroupColor(color)) {
+    redirect(saleId ? `/sales/${saleId}?view=details&error=group` : "/sales");
+  }
+
+  const sale = await prisma.estateSale.findUnique({
+    where: { id: saleId },
+    select: { id: true }
+  });
+
+  if (!sale) {
+    redirect("/sales");
+  }
+
+  const name = requestedName ?? reportGroupColor(color).label;
+  if (name.length > 40) {
+    redirect(`/sales/${saleId}?view=details&error=groupName`);
+  }
+
+  const before = await prisma.reportGroup.findUnique({
+    where: {
+      estateSaleId_color: {
+        estateSaleId: saleId,
+        color
+      }
+    }
+  });
+
+  const after = await prisma.reportGroup.upsert({
+    where: {
+      estateSaleId_color: {
+        estateSaleId: saleId,
+        color
+      }
+    },
+    update: {
+      name,
+      isActive: true
+    },
+    create: {
+      estateSaleId: saleId,
+      name,
+      color
+    }
+  });
+
+  await recordActivity({
+    actorUserId: user.id,
+    actorTeamId: user.teamId,
+    entityType: "report_group",
+    entityId: after.id,
+    action: before ? "reactivate" : "create",
+    before: before ?? undefined,
+    after
+  });
+
+  revalidateSaleGroupPaths(saleId);
+  redirect(`/sales/${saleId}?view=details&groupSaved=1`);
+}
+
+export async function updateReportGroupAction(formData: FormData) {
+  const user = await requireManagement();
+  const groupId = formId(formData.get("reportGroupId"));
+  const name = optionalString(formData.get("name"));
+
+  if (!groupId || !name || name.length > 40) {
+    redirect("/sales");
+  }
+
+  const before = await prisma.reportGroup.findUnique({
+    where: { id: groupId }
+  });
+
+  if (!before) {
+    redirect("/sales");
+  }
+
+  const after = await prisma.reportGroup.update({
+    where: { id: groupId },
+    data: { name }
+  });
+
+  await recordActivity({
+    actorUserId: user.id,
+    actorTeamId: user.teamId,
+    entityType: "report_group",
+    entityId: groupId,
+    action: "update",
+    before,
+    after
+  });
+
+  revalidateSaleGroupPaths(before.estateSaleId);
+  redirect(`/sales/${before.estateSaleId}?view=details&groupUpdated=1`);
+}
+
+export async function toggleReportGroupAction(formData: FormData) {
+  const user = await requireManagement();
+  const groupId = formId(formData.get("reportGroupId"));
+
+  if (!groupId) {
+    redirect("/sales");
+  }
+
+  const before = await prisma.reportGroup.findUnique({
+    where: { id: groupId }
+  });
+
+  if (!before) {
+    redirect("/sales");
+  }
+
+  const after = await prisma.reportGroup.update({
+    where: { id: groupId },
+    data: { isActive: !before.isActive }
+  });
+
+  await recordActivity({
+    actorUserId: user.id,
+    actorTeamId: user.teamId,
+    entityType: "report_group",
+    entityId: groupId,
+    action: after.isActive ? "reactivate" : "deactivate",
+    before,
+    after
+  });
+
+  revalidateSaleGroupPaths(before.estateSaleId);
+  redirect(
+    `/sales/${before.estateSaleId}?view=details&${
+      after.isActive ? "groupActivated" : "groupDeactivated"
+    }=1`
+  );
+}
+
 export async function archiveEstateSaleAction(formData: FormData) {
   const user = await requireManagement();
   const saleId = formId(formData.get("saleId"));
@@ -301,6 +452,46 @@ async function requireSaleItemAccess({
   return sale;
 }
 
+async function reportGroupForNewItems({
+  saleId,
+  value,
+  entryPath
+}: {
+  saleId: number;
+  value: FormDataEntryValue | null;
+  entryPath: "quick-entry" | "batch";
+}) {
+  const reportGroupId = formId(value);
+
+  if (reportGroupId) {
+    const group = await prisma.reportGroup.findFirst({
+      where: {
+        id: reportGroupId,
+        estateSaleId: saleId,
+        isActive: true
+      },
+      select: { id: true }
+    });
+
+    if (group) {
+      return group.id;
+    }
+  }
+
+  const activeGroupCount = await prisma.reportGroup.count({
+    where: {
+      estateSaleId: saleId,
+      isActive: true
+    }
+  });
+
+  if (activeGroupCount > 0) {
+    redirect(`/sales/${saleId}/${entryPath}?error=group`);
+  }
+
+  return null;
+}
+
 export async function createSoldItemAction(formData: FormData) {
   const user = await requireUser();
   const saleId = formId(formData.get("saleId"));
@@ -312,6 +503,11 @@ export async function createSoldItemAction(formData: FormData) {
   }
 
   await requireSaleItemAccess({ user, saleId });
+  const reportGroupId = await reportGroupForNewItems({
+    saleId,
+    value: formData.get("reportGroupId"),
+    entryPath: "quick-entry"
+  });
 
   const source =
     optionalString(formData.get("entrySource")) === "PAPER"
@@ -325,6 +521,7 @@ export async function createSoldItemAction(formData: FormData) {
       estateSaleId: saleId,
       submittedTeamId: user.role === Role.TEAM ? user.teamId : null,
       createdByUserId: user.id,
+      reportGroupId,
       itemDescription: description,
       finalSoldPriceCents: priceCents,
       entrySource: source,
@@ -362,6 +559,11 @@ export async function createBatchItemsAction(formData: FormData) {
   }
 
   await requireSaleItemAccess({ user, saleId });
+  const reportGroupId = await reportGroupForNewItems({
+    saleId,
+    value: formData.get("reportGroupId"),
+    entryPath: "batch"
+  });
 
   const descriptions = formData.getAll("description[]");
   const prices = formData.getAll("price[]");
@@ -382,6 +584,7 @@ export async function createBatchItemsAction(formData: FormData) {
       estateSaleId: saleId,
       submittedTeamId: user.role === Role.TEAM ? user.teamId : null,
       createdByUserId: user.id,
+      reportGroupId,
       itemDescription: description,
       finalSoldPriceCents: priceCents,
       entrySource: EntrySource.PAPER,
@@ -435,16 +638,34 @@ export async function updateSoldItemAction(formData: FormData) {
 
   const description = optionalString(formData.get("description"));
   const priceCents = dollarsToCents(formData.get("price"));
+  const requestedReportGroupId = formId(formData.get("reportGroupId"));
 
   if (!description || priceCents === null) {
     redirect(`/items/${itemId}/edit?error=missing`);
+  }
+
+  const reportGroupId = requestedReportGroupId
+    ? (
+        await prisma.reportGroup.findFirst({
+          where: {
+            id: requestedReportGroupId,
+            estateSaleId: before.estateSaleId
+          },
+          select: { id: true }
+        })
+      )?.id ?? null
+    : null;
+
+  if (requestedReportGroupId && !reportGroupId) {
+    redirect(`/items/${itemId}/edit?error=group`);
   }
 
   const after = await prisma.soldItem.update({
     where: { id: itemId },
     data: {
       itemDescription: description,
-      finalSoldPriceCents: priceCents
+      finalSoldPriceCents: priceCents,
+      reportGroupId
     }
   });
 

@@ -6,8 +6,11 @@ import {
   FileBarChart2,
   MapPin,
   NotebookPen,
+  Power,
+  PowerOff,
   RotateCcw,
   Rows3,
+  Tags,
   Trash2
 } from "lucide-react";
 import { Role, SaleStatus } from "@prisma/client";
@@ -16,9 +19,12 @@ import { requireUser } from "@/lib/auth";
 import {
   archiveEstateSaleAction,
   archiveSoldItemAction,
+  createReportGroupAction,
   deleteSoldItemAction,
   deleteEstateSaleAction,
   restoreSoldItemAction,
+  toggleReportGroupAction,
+  updateReportGroupAction,
   updateEstateSaleAction
 } from "@/lib/actions";
 import {
@@ -45,6 +51,8 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfirmButton } from "@/components/confirm-button";
 import { Breadcrumbs } from "@/components/breadcrumbs";
+import { ReportGroupBadge } from "@/components/report-group-badge";
+import { REPORT_GROUP_COLORS } from "@/lib/report-groups";
 import { cn } from "@/lib/utils";
 
 function Stat({ label, value }: { label: string; value: number }) {
@@ -80,7 +88,16 @@ export default async function SaleDetailPage({
         assignedTeam: true,
         createdByUser: true,
         createdByTeam: true,
+        reportGroups: {
+          include: {
+            _count: {
+              select: { soldItems: true }
+            }
+          },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }]
+        },
         soldItems: {
+          include: { reportGroup: true },
           orderBy: {
             createdAt: "desc"
           }
@@ -147,6 +164,11 @@ export default async function SaleDetailPage({
       {paramsValue.error === "permission" ? (
         <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-sm font-semibold text-destructive">
           Teams can edit, archive, or delete only their own entries on sales currently assigned to their team.
+        </div>
+      ) : null}
+      {paramsValue.error === "group" || paramsValue.error === "groupName" ? (
+        <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-sm font-semibold text-destructive">
+          Choose a valid color and keep the report group name under 40 characters.
         </div>
       ) : null}
 
@@ -313,6 +335,142 @@ export default async function SaleDetailPage({
           </Card>
 
           {isManager ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Tags className="size-5 text-accent" aria-hidden="true" />
+                  Report groups
+                </CardTitle>
+                <CardDescription>
+                  Create color-coded groups for separate item entry and reporting
+                  within this sale. Pausing a group never changes existing items.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {sale.reportGroups.length > 0 ? (
+                  <div className="space-y-2">
+                    {sale.reportGroups.map((group) => (
+                      <div
+                        key={group.id}
+                        className={cn(
+                          "rounded-lg border border-border bg-muted/25 p-3",
+                          !group.isActive && "opacity-65"
+                        )}
+                      >
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <ReportGroupBadge group={group} />
+                            {!group.isActive ? (
+                              <Badge variant="muted">Paused</Badge>
+                            ) : null}
+                          </div>
+                          <span className="text-xs font-semibold text-muted-foreground">
+                            {group._count.soldItems} tagged item
+                            {group._count.soldItems === 1 ? "" : "s"}
+                          </span>
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                          <form
+                            action={updateReportGroupAction}
+                            className="flex min-w-0 gap-2"
+                          >
+                            <input
+                              type="hidden"
+                              name="reportGroupId"
+                              value={group.id}
+                            />
+                            <Input
+                              name="name"
+                              defaultValue={group.name}
+                              aria-label={`${group.name} report group name`}
+                              maxLength={40}
+                              required
+                              className="min-w-0"
+                            />
+                            <Button type="submit" variant="outline">
+                              Save name
+                            </Button>
+                          </form>
+                          <form action={toggleReportGroupAction}>
+                            <input
+                              type="hidden"
+                              name="reportGroupId"
+                              value={group.id}
+                            />
+                            <Button
+                              type="submit"
+                              variant={group.isActive ? "ghost" : "secondary"}
+                              className="w-full sm:w-auto"
+                            >
+                              {group.isActive ? (
+                                <>
+                                  <PowerOff aria-hidden="true" />
+                                  Pause
+                                </>
+                              ) : (
+                                <>
+                                  <Power aria-hidden="true" />
+                                  Reactivate
+                                </>
+                              )}
+                            </Button>
+                          </form>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
+                    No report groups yet. Items currently flow into the combined
+                    report.
+                  </p>
+                )}
+
+                <form
+                  action={createReportGroupAction}
+                  className="grid gap-3 rounded-lg border border-border bg-card p-3 sm:grid-cols-2"
+                >
+                  <input type="hidden" name="saleId" value={sale.id} />
+                  <div className="space-y-1.5">
+                    <Label htmlFor="newGroupColor">Color</Label>
+                    <Select id="newGroupColor" name="color" defaultValue="blue">
+                      {REPORT_GROUP_COLORS.map((color) => (
+                        <option key={color.value} value={color.value}>
+                          {color.label}
+                          {sale.reportGroups.some(
+                            (group) => group.color === color.value
+                          )
+                            ? " (already created)"
+                            : ""}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="newGroupName">Name</Label>
+                    <Input
+                      id="newGroupName"
+                      name="name"
+                      placeholder="Optional, e.g. Sister"
+                      maxLength={40}
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Button type="submit" variant="accent" className="w-full sm:w-auto">
+                      <Tags aria-hidden="true" />
+                      Add or reactivate group
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground sm:col-span-2">
+                    Reusing a color updates and reactivates its existing group.
+                    The selected color name is used when no custom name is supplied.
+                  </p>
+                </form>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {isManager ? (
             <Card className="border-destructive/30">
               <CardHeader>
                 <CardTitle>Danger zone</CardTitle>
@@ -407,6 +565,11 @@ export default async function SaleDetailPage({
                             <div className="mt-0.5 text-xs text-muted-foreground">
                               Added {shortDate(item.createdAt)}
                             </div>
+                            <ReportGroupBadge
+                              group={item.reportGroup}
+                              showUnassigned={sale.reportGroups.length > 0}
+                              className="mt-1.5"
+                            />
                           </div>
                           <div className="price shrink-0 text-lg font-bold">
                             {centsToDollars(item.finalSoldPriceCents)}

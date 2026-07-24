@@ -11,6 +11,11 @@ import { PrintButton } from "@/components/print-button";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { ReportGroupBadge } from "@/components/report-group-badge";
+import {
+  matchesReportGroupFilter,
+  resolveReportGroupFilter
+} from "@/lib/report-groups";
 
 export default async function SaleReportPage({
   params,
@@ -31,7 +36,11 @@ export default async function SaleReportPage({
     where: { id: saleId },
     include: {
       assignedTeam: true,
+      reportGroups: {
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }]
+      },
       soldItems: {
+        include: { reportGroup: true },
         orderBy: {
           finalSoldPriceCents: "desc"
         }
@@ -50,9 +59,22 @@ export default async function SaleReportPage({
   const paramsValue = (await searchParams) ?? {};
   const includeUnderThreshold = paramsValue.include_under_threshold === "true";
   const includeArchived = paramsValue.include_archived === "true";
+  const requestedGroup =
+    typeof paramsValue.group === "string" ? paramsValue.group : "all";
+  const groupFilter = resolveReportGroupFilter(
+    requestedGroup,
+    sale.reportGroups
+  );
+  const selectedGroup =
+    typeof groupFilter === "number"
+      ? sale.reportGroups.find((group) => group.id === groupFilter) ?? null
+      : null;
 
   const filteredItems = sale.soldItems
     .filter((item) => includeArchived || !item.isArchived)
+    .filter((item) =>
+      matchesReportGroupFilter(item.reportGroupId, groupFilter)
+    )
     .filter(
       (item) =>
         includeUnderThreshold ||
@@ -73,11 +95,35 @@ export default async function SaleReportPage({
     if (key === "include_archived" ? value : includeArchived) {
       query.set("include_archived", "true");
     }
+    if (groupFilter !== "all") {
+      query.set("group", String(groupFilter));
+    }
+    const suffix = query.toString();
+    return `/sales/${sale.id}/report${suffix ? `?${suffix}` : ""}`;
+  };
+
+  const groupHref = (group: string) => {
+    const query = new URLSearchParams();
+    if (includeUnderThreshold) {
+      query.set("include_under_threshold", "true");
+    }
+    if (includeArchived) {
+      query.set("include_archived", "true");
+    }
+    if (group !== "all") {
+      query.set("group", group);
+    }
     const suffix = query.toString();
     return `/sales/${sale.id}/report${suffix ? `?${suffix}` : ""}`;
   };
 
   const generatedOn = shortDate(new Date());
+  const reportGroupLabel =
+    groupFilter === "unassigned"
+      ? "Unassigned items"
+      : selectedGroup
+        ? `${selectedGroup.name} items`
+        : "All report groups";
 
   return (
     <AppShell user={user} focus>
@@ -86,7 +132,9 @@ export default async function SaleReportPage({
       {/* Client-facing letterhead — shown only in print / PDF exports. */}
       <div className="mb-4 hidden print:block">
         <p className="stamp text-[0.7rem] text-muted-foreground">
-          items sold for 25 or greater
+          {includeUnderThreshold
+            ? "all sold item prices"
+            : `items sold for ${centsToDollars(sale.reportThresholdCents)} or greater`}
         </p>
         <h1 className="font-display text-2xl font-extrabold tracking-tight">
           {saleTitle(sale)}
@@ -100,6 +148,7 @@ export default async function SaleReportPage({
             </div>
           ) : null}
           <div>Generated {generatedOn}</div>
+          <div>Report group: {reportGroupLabel}</div>
         </div>
         <div className="perforated mt-3" />
       </div>
@@ -114,6 +163,15 @@ export default async function SaleReportPage({
             <p className="price text-4xl font-bold leading-none tracking-tight sm:text-5xl">
               {centsToDollars(totalCents)}
             </p>
+            <div className="mt-2">
+              {groupFilter === "unassigned" ? (
+                <ReportGroupBadge group={null} showUnassigned />
+              ) : selectedGroup ? (
+                <ReportGroupBadge group={selectedGroup} />
+              ) : (
+                <Badge variant="outline">All report groups</Badge>
+              )}
+            </div>
           </div>
           <div className="text-sm">
             <div>
@@ -123,6 +181,49 @@ export default async function SaleReportPage({
           </div>
         </CardContent>
       </Card>
+
+      {sale.reportGroups.length > 0 ? (
+        <div className="mb-4 rounded-lg border border-border bg-card p-3 print:hidden">
+          <div className="mb-2">
+            <p className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
+              Report group
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Choose one group to produce its separate total and printable report.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              asChild
+              size="sm"
+              variant={groupFilter === "all" ? "secondary" : "outline"}
+            >
+              <Link href={groupHref("all")}>All items</Link>
+            </Button>
+            {sale.reportGroups.map((group) => (
+              <Button
+                key={group.id}
+                asChild
+                size="sm"
+                variant={
+                  groupFilter === group.id ? "secondary" : "outline"
+                }
+              >
+                <Link href={groupHref(String(group.id))}>
+                  <ReportGroupBadge group={group} className="border-0 bg-transparent p-0" />
+                </Link>
+              </Button>
+            ))}
+            <Button
+              asChild
+              size="sm"
+              variant={groupFilter === "unassigned" ? "secondary" : "outline"}
+            >
+              <Link href={groupHref("unassigned")}>Unassigned</Link>
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2 print:hidden">
         <div className="flex flex-wrap gap-2">
@@ -188,6 +289,13 @@ export default async function SaleReportPage({
                     </span>
                     {item.isArchived ? <Badge variant="muted">Archived</Badge> : null}
                   </div>
+                  {groupFilter === "all" && sale.reportGroups.length > 0 ? (
+                    <ReportGroupBadge
+                      group={item.reportGroup}
+                      showUnassigned
+                      className="mt-1"
+                    />
+                  ) : null}
                 </div>
                 <span className="price shrink-0 font-bold">
                   {centsToDollars(item.finalSoldPriceCents)}

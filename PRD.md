@@ -318,6 +318,31 @@ Examples:
 
 Do not require bundle items to be broken apart.
 
+### 8.5 Sale Report Groups
+
+One estate sale may need multiple client-facing reports without duplicating the
+sale record. Management can create color-coded report groups such as Blue,
+Red, Sister, or Consignor A within the sale.
+
+When active report groups exist:
+
+* Each phone or browser chooses an active group for that sale.
+* The choice persists on that device and sale until changed.
+* Quick-entry and batch-entry items are tagged with the active group.
+* A group must be selected before saving new items.
+* An item’s group can be corrected from the item edit screen.
+* Pausing a group removes it from new-entry selection but preserves all
+  historical item assignments and reports.
+
+Reports support:
+
+* All items across the sale.
+* One report group with its own item count and total.
+* Unassigned items, including entries created before groups were enabled.
+* The existing threshold and archived-item filters within any group view.
+
+Existing items are not automatically assigned when report groups are added.
+
 ---
 
 ## 9. Category and Label Model

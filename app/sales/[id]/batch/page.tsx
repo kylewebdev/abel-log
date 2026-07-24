@@ -7,9 +7,11 @@ import { SaleContextHeader } from "@/components/sale-context-header";
 import { BatchEntryForm } from "@/components/batch-entry-form";
 
 export default async function BatchEntryPage({
-  params
+  params,
+  searchParams
 }: {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const user = await requireUser();
   const { id } = await params;
@@ -21,7 +23,13 @@ export default async function BatchEntryPage({
 
   const sale = await prisma.estateSale.findUnique({
     where: { id: saleId },
-    include: { assignedTeam: true }
+    include: {
+      assignedTeam: true,
+      reportGroups: {
+        where: { isActive: true },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }]
+      }
+    }
   });
 
   if (!sale) {
@@ -31,6 +39,8 @@ export default async function BatchEntryPage({
   if (!canAccessSale(user, sale)) {
     redirect(`/sales/${sale.id}?error=permission`);
   }
+
+  const paramsValue = (await searchParams) ?? {};
 
   return (
     <AppShell user={user} focus>
@@ -48,7 +58,13 @@ export default async function BatchEntryPage({
         </p>
       </div>
 
-      <BatchEntryForm saleId={sale.id} />
+      {paramsValue.error === "group" ? (
+        <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-sm font-semibold text-destructive">
+          Choose an active report group before saving these items.
+        </div>
+      ) : null}
+
+      <BatchEntryForm saleId={sale.id} reportGroups={sale.reportGroups} />
     </AppShell>
   );
 }

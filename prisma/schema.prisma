@@ -27,94 +27,114 @@ enum EntrySource {
 }
 
 model Team {
-  id                 Int             @id @default(autoincrement())
+  id                 Int           @id @default(autoincrement())
   name               String
-  slug               String          @unique
-  isActive           Boolean         @default(true)
+  slug               String        @unique
+  isActive           Boolean       @default(true)
   users              User[]
-  submittedSoldItems SoldItem[]      @relation("SubmittedTeam")
-  createdEstateSales EstateSale[]    @relation("CreatedByTeam")
-  assignedSales      EstateSale[]    @relation("AssignedTeam")
+  submittedSoldItems SoldItem[]    @relation("SubmittedTeam")
+  createdEstateSales EstateSale[]  @relation("CreatedByTeam")
+  assignedSales      EstateSale[]  @relation("AssignedTeam")
   activityLogs       ActivityLog[]
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 }
 
 model User {
-  id                    Int             @id @default(autoincrement())
-  name                  String
-  username              String          @unique
-  passwordHash          String
-  role                  Role
-  teamId                Int?
-  team                  Team?           @relation(fields: [teamId], references: [id])
-  isActive              Boolean         @default(true)
-  createdEstateSales    EstateSale[]    @relation("CreatedByUser")
-  createdSoldItems      SoldItem[]      @relation("CreatedByUser")
-  archivedSoldItems     SoldItem[]      @relation("ArchivedByUser")
-  activityLogs          ActivityLog[]
-  createdAt             DateTime        @default(now())
-  updatedAt             DateTime        @updatedAt
+  id                 Int           @id @default(autoincrement())
+  name               String
+  username           String        @unique
+  passwordHash       String
+  role               Role
+  teamId             Int?
+  team               Team?         @relation(fields: [teamId], references: [id])
+  isActive           Boolean       @default(true)
+  createdEstateSales EstateSale[]  @relation("CreatedByUser")
+  createdSoldItems   SoldItem[]    @relation("CreatedByUser")
+  archivedSoldItems  SoldItem[]    @relation("ArchivedByUser")
+  activityLogs       ActivityLog[]
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 }
 
 model EstateSale {
-  id                  Int        @id @default(autoincrement())
-  addressRaw          String
-  formattedAddress    String?
-  normalizedAddress   String
-  addressLine1        String?
-  addressLine2        String?
-  city                String?
-  state               String?
-  postalCode          String?
-  country             String?
-  googlePlaceId       String?
-  latitude            Float?
-  longitude           Float?
-  saleName            String?
-  clientName          String?
-  notes               String?
-  status              SaleStatus @default(ACTIVE)
-  reportThresholdCents Int       @default(2500)
-  startDate           DateTime?
-  endDate             DateTime?
-  assignedTeamId      Int?
-  assignedTeam        Team?      @relation("AssignedTeam", fields: [assignedTeamId], references: [id])
-  createdByUserId     Int
-  createdByUser       User       @relation("CreatedByUser", fields: [createdByUserId], references: [id])
-  createdByTeamId     Int?
-  createdByTeam       Team?      @relation("CreatedByTeam", fields: [createdByTeamId], references: [id])
-  soldItems           SoldItem[]
-  createdAt           DateTime   @default(now())
-  updatedAt           DateTime   @updatedAt
-  archivedAt          DateTime?
+  id                   Int           @id @default(autoincrement())
+  addressRaw           String
+  formattedAddress     String?
+  normalizedAddress    String
+  addressLine1         String?
+  addressLine2         String?
+  city                 String?
+  state                String?
+  postalCode           String?
+  country              String?
+  googlePlaceId        String?
+  latitude             Float?
+  longitude            Float?
+  saleName             String?
+  clientName           String?
+  notes                String?
+  status               SaleStatus    @default(ACTIVE)
+  reportThresholdCents Int           @default(2500)
+  startDate            DateTime?
+  endDate              DateTime?
+  assignedTeamId       Int?
+  assignedTeam         Team?         @relation("AssignedTeam", fields: [assignedTeamId], references: [id])
+  createdByUserId      Int
+  createdByUser        User          @relation("CreatedByUser", fields: [createdByUserId], references: [id])
+  createdByTeamId      Int?
+  createdByTeam        Team?         @relation("CreatedByTeam", fields: [createdByTeamId], references: [id])
+  reportGroups         ReportGroup[]
+  soldItems            SoldItem[]
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  archivedAt           DateTime?
 
   @@index([status])
   @@index([normalizedAddress, status])
   @@index([googlePlaceId, status])
 }
 
+model ReportGroup {
+  id           Int        @id @default(autoincrement())
+  estateSaleId Int
+  estateSale   EstateSale @relation(fields: [estateSaleId], references: [id], onDelete: Cascade)
+  name         String
+  color        String
+  isActive     Boolean    @default(true)
+  soldItems    SoldItem[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([id, estateSaleId])
+  @@unique([estateSaleId, color])
+  @@index([estateSaleId, isActive])
+}
+
 model SoldItem {
-  id                 Int             @id @default(autoincrement())
-  estateSaleId       Int
-  estateSale         EstateSale      @relation(fields: [estateSaleId], references: [id])
-  submittedTeamId    Int?
-  submittedTeam      Team?           @relation("SubmittedTeam", fields: [submittedTeamId], references: [id])
-  createdByUserId    Int
-  createdByUser      User            @relation("CreatedByUser", fields: [createdByUserId], references: [id])
-  itemDescription    String
+  id                  Int          @id @default(autoincrement())
+  estateSaleId        Int
+  estateSale          EstateSale   @relation(fields: [estateSaleId], references: [id])
+  submittedTeamId     Int?
+  submittedTeam       Team?        @relation("SubmittedTeam", fields: [submittedTeamId], references: [id])
+  createdByUserId     Int
+  createdByUser       User         @relation("CreatedByUser", fields: [createdByUserId], references: [id])
+  reportGroupId       Int?
+  reportGroup         ReportGroup? @relation(fields: [reportGroupId, estateSaleId], references: [id, estateSaleId], onDelete: Restrict)
+  itemDescription     String
   finalSoldPriceCents Int
-  entrySource        EntrySource     @default(LIVE_APP)
-  isArchived         Boolean         @default(false)
-  archivedAt         DateTime?
-  archivedByUserId   Int?
-  archivedByUser     User?           @relation("ArchivedByUser", fields: [archivedByUserId], references: [id])
-  archiveReason      String?
-  soldDate           DateTime?
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
+  entrySource         EntrySource  @default(LIVE_APP)
+  isArchived          Boolean      @default(false)
+  archivedAt          DateTime?
+  archivedByUserId    Int?
+  archivedByUser      User?        @relation("ArchivedByUser", fields: [archivedByUserId], references: [id])
+  archiveReason       String?
+  soldDate            DateTime?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
 
   @@index([estateSaleId, isArchived])
+  @@index([estateSaleId, reportGroupId, isArchived])
   @@index([submittedTeamId])
 }
 

@@ -13,10 +13,14 @@ This is a small internal business app built with Next.js App Router, TypeScript,
 - Team-owned estate sales: team-created sales are assigned to that team; management can assign any active team.
 - Quick sold-item entry for one item at a time.
 - Batch paper-note entry for rush-hour handwritten sheets.
+- Sale-specific, color-coded report groups with a sticky per-device selection
+  for quick and batch entry.
 - Team ownership permissions: teams access assigned sales and edit, archive, or delete only entries originally submitted by their team.
 - Management permissions: assign teams, edit sales, restore entries, and permanently delete entries across all teams.
 - Entries can be edited, archived, restored by management, or permanently deleted.
-- Flat itemized sale report that defaults to non-archived items at or above the sale threshold, sorted by price.
+- Flat itemized sale report that defaults to non-archived items at or above the
+  sale threshold, can be filtered to one report group or unassigned items, and
+  is sorted by price.
 
 ## Not In This MVP
 
@@ -103,3 +107,14 @@ Management workflow:
 3. Edit sale details, assign teams, or update item descriptions and prices.
 4. Archive, restore, or permanently delete entries as needed.
 5. Open a sale report to check the client-facing itemized output.
+
+Report-group workflow:
+
+1. Management opens a sale’s `Edit details` tab and creates the needed
+   color-coded report groups.
+2. Each entry device chooses its active group once for that sale.
+3. Quick-entry and batch-entry items stay tagged with that group until the
+   device switches it.
+4. Open the report and choose `All items`, a specific group, or `Unassigned`.
+5. Edit an item to correct its report group if it was logged under the wrong
+   one.

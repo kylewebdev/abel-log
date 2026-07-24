@@ -9,6 +9,8 @@ import { centsToDollars } from "@/lib/format";
 import { AppShell } from "@/components/app-shell";
 import { SaleContextHeader } from "@/components/sale-context-header";
 import { StatusMessage } from "@/components/status-message";
+import { ReportGroupBadge } from "@/components/report-group-badge";
+import { ReportGroupPicker } from "@/components/report-group-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,13 +33,20 @@ export default async function QuickEntryPage({
   const [sale, recentItems] = await Promise.all([
     prisma.estateSale.findUnique({
       where: { id: saleId },
-      include: { assignedTeam: true }
+      include: {
+        assignedTeam: true,
+        reportGroups: {
+          where: { isActive: true },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }]
+        }
+      }
     }),
     prisma.soldItem.findMany({
       where: {
         estateSaleId: saleId
       },
       orderBy: { createdAt: "desc" },
+      include: { reportGroup: true },
       take: 6
     })
   ]);
@@ -63,11 +72,18 @@ export default async function QuickEntryPage({
           Add a description and a final sold price.
         </div>
       ) : null}
+      {paramsValue.error === "group" ? (
+        <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-sm font-semibold text-destructive">
+          Choose an active report group before saving this item.
+        </div>
+      ) : null}
 
       <form action={createSoldItemAction}>
         <input type="hidden" name="saleId" value={sale.id} />
 
         <div className="space-y-4">
+          <ReportGroupPicker saleId={sale.id} groups={sale.reportGroups} />
+
           <div className="space-y-1.5">
             <Label htmlFor="description">Item or bundle sold</Label>
             <Input
@@ -162,6 +178,11 @@ export default async function QuickEntryPage({
                       </span>
                     ) : null}
                   </div>
+                  <ReportGroupBadge
+                    group={item.reportGroup}
+                    showUnassigned={sale.reportGroups.length > 0}
+                    className="mt-1"
+                  />
                 </div>
                 <span className="price shrink-0 text-lg font-bold">
                   {centsToDollars(item.finalSoldPriceCents)}

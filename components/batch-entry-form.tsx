@@ -6,6 +6,7 @@ import { createBatchItemsAction } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ReportGroupPicker } from "@/components/report-group-picker";
 
 type Row = {
   id: number;
@@ -24,9 +25,15 @@ function blankRow(): Row {
 }
 
 export function BatchEntryForm({
-  saleId
+  saleId,
+  reportGroups
 }: {
   saleId: number;
+  reportGroups: {
+    id: number;
+    name: string;
+    color: string;
+  }[];
 }) {
   const [rows, setRows] = useState<Row[]>(() => [blankRow(), blankRow(), blankRow()]);
 
@@ -82,6 +89,10 @@ export function BatchEntryForm({
   return (
     <form action={createBatchItemsAction}>
       <input type="hidden" name="saleId" value={saleId} />
+
+      <div className="mb-4">
+        <ReportGroupPicker saleId={saleId} groups={reportGroups} />
+      </div>
 
       <div className="mb-4 flex gap-3 rounded-lg border border-border bg-muted/45 p-3.5">
         <span className="flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-card text-accent shadow-sm">

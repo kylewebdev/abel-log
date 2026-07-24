@@ -16,9 +16,11 @@ import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmButton } from "@/components/confirm-button";
 import { Breadcrumbs } from "@/components/breadcrumbs";
+import { ReportGroupBadge } from "@/components/report-group-badge";
 
 export default async function EditItemPage({
   params,
@@ -38,7 +40,14 @@ export default async function EditItemPage({
   const item = await prisma.soldItem.findUnique({
     where: { id: itemId },
     include: {
-      estateSale: true
+      reportGroup: true,
+      estateSale: {
+        include: {
+          reportGroups: {
+            orderBy: [{ isActive: "desc" }, { createdAt: "asc" }, { id: "asc" }]
+          }
+        }
+      }
     }
   });
 
@@ -78,6 +87,9 @@ export default async function EditItemPage({
           <Badge variant={item.isArchived ? "muted" : "secondary"}>
             {item.isArchived ? "Archived item" : "Edit item"}
           </Badge>
+          {item.estateSale.reportGroups.length > 0 ? (
+            <ReportGroupBadge group={item.reportGroup} showUnassigned />
+          ) : null}
         </div>
         <h1 className="font-display text-2xl font-extrabold leading-tight tracking-tight">
           {item.itemDescription}
@@ -91,10 +103,37 @@ export default async function EditItemPage({
             Description and final sold price are required.
           </div>
         ) : null}
+        {paramsValue.error === "group" ? (
+          <div className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-sm font-semibold text-destructive">
+            Choose a report group that belongs to this sale.
+          </div>
+        ) : null}
 
         <form id="edit-item-form" action={updateSoldItemAction} className="mt-5 space-y-4">
           <input type="hidden" name="itemId" value={item.id} />
           <input type="hidden" name="next" value={next} />
+          {item.estateSale.reportGroups.length > 0 ? (
+            <div className="space-y-1.5">
+              <Label htmlFor="reportGroupId">Report group</Label>
+              <Select
+                id="reportGroupId"
+                name="reportGroupId"
+                defaultValue={item.reportGroupId ? String(item.reportGroupId) : ""}
+                className="font-bold"
+              >
+                <option value="">Unassigned</option>
+                {item.estateSale.reportGroups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                    {group.isActive ? "" : " (paused)"}
+                  </option>
+                ))}
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Correct the group here if this item was logged under the wrong one.
+              </p>
+            </div>
+          ) : null}
           <div className="space-y-1.5">
             <Label htmlFor="description">Item description</Label>
             <Input

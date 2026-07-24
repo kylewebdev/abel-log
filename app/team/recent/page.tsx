@@ -14,6 +14,7 @@ import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmButton } from "@/components/confirm-button";
+import { ReportGroupBadge } from "@/components/report-group-badge";
 
 export default async function TeamRecentPage() {
   const user = await requireUser();
@@ -25,7 +26,8 @@ export default async function TeamRecentPage() {
           submittedTeamId: user.teamId ?? -1
         },
     include: {
-      estateSale: true
+      estateSale: true,
+      reportGroup: true
     },
     orderBy: {
       createdAt: "desc"
@@ -81,6 +83,9 @@ export default async function TeamRecentPage() {
                     <div className="text-xs text-muted-foreground">
                       Added {shortDate(item.createdAt)}
                     </div>
+                    {item.reportGroup ? (
+                      <ReportGroupBadge group={item.reportGroup} className="mt-1" />
+                    ) : null}
                   </div>
                   <div className="price shrink-0 text-lg font-bold">
                     {centsToDollars(item.finalSoldPriceCents)}

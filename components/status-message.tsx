@@ -7,6 +7,11 @@ const messages: Record<string, string> = {
   duplicate:
     "An active sale already exists for this address — opened the existing one.",
   updated: "Changes saved.",
+  groupSaved: "Report group created and ready to use.",
+  groupUpdated: "Report group name updated.",
+  groupActivated: "Report group reactivated for new entries.",
+  groupDeactivated:
+    "Report group paused. Existing tagged items and reports are unchanged.",
   archived: "Sale archived — hidden from the active list.",
   restored: "Sale restored to the active list.",
   deleted: "Sale deleted."
