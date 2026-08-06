@@ -1,10 +1,14 @@
 import Link from "next/link";
 import {
+  Archive,
   CalendarDays,
+  Eye,
+  EyeOff,
   FileBarChart2,
   MapPin,
   NotebookPen,
   Plus,
+  RotateCcw,
   Rows3
 } from "lucide-react";
 import { Role, SaleStatus } from "@prisma/client";
@@ -17,13 +21,21 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { centsToDollars, saleDateRange, saleTitle } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { archiveEstateSaleAction } from "@/lib/actions";
+import {
+  INCLUDE_ARCHIVED_SALES_PARAM,
+  shouldIncludeArchivedSales
+} from "@/lib/sale-list";
 
-async function getListedSales(user: { role: Role; teamId: number | null }) {
+async function getListedSales(
+  user: { role: Role; teamId: number | null },
+  includeArchived: boolean
+) {
   return prisma.estateSale.findMany({
     where: {
-      status: {
-        not: SaleStatus.ARCHIVED
-      },
+      ...(!includeArchived
+        ? { status: { not: SaleStatus.ARCHIVED } }
+        : {}),
       ...(user.role === Role.TEAM ? { assignedTeamId: user.teamId ?? -1 } : {})
     },
     include: {
@@ -39,7 +51,13 @@ async function getListedSales(user: { role: Role; teamId: number | null }) {
 }
 
 type ListedSale = Awaited<ReturnType<typeof getListedSales>>[number];
-type SaleTiming = "Active" | "Upcoming" | "Dates needed" | "Ended" | "Completed";
+type SaleTiming =
+  | "Active"
+  | "Upcoming"
+  | "Dates needed"
+  | "Ended"
+  | "Completed"
+  | "Archived";
 
 const UNDATED_SORT_VALUE = Number.MAX_SAFE_INTEGER;
 const MISSING_PAST_SORT_VALUE = Number.MIN_SAFE_INTEGER;
@@ -104,7 +122,20 @@ function sortEndedSales(a: ListedSale, b: ListedSale) {
   );
 }
 
+function sortArchivedSales(a: ListedSale, b: ListedSale) {
+  return (
+    compareNumbers(
+      b.archivedAt?.getTime() ?? b.updatedAt.getTime(),
+      a.archivedAt?.getTime() ?? a.updatedAt.getTime()
+    ) || compareNumbers(b.createdAt.getTime(), a.createdAt.getTime())
+  );
+}
+
 function saleTiming(sale: ListedSale, today: Date): SaleTiming {
+  if (sale.status === SaleStatus.ARCHIVED) {
+    return "Archived";
+  }
+
   if (sale.status === SaleStatus.COMPLETED) {
     return "Completed";
   }
@@ -126,15 +157,20 @@ function saleTiming(sale: ListedSale, today: Date): SaleTiming {
 
 function SaleCard({
   sale,
-  timing
+  timing,
+  canManageSales,
+  includeArchived
 }: {
   sale: ListedSale;
   timing: SaleTiming;
+  canManageSales: boolean;
+  includeArchived: boolean;
 }) {
   const activeEntries = sale.soldItems.filter((item) => !item.isArchived);
-  const isEnded = timing === "Ended" || timing === "Completed";
+  const isArchived = timing === "Archived";
+  const isEnded = timing === "Ended" || timing === "Completed" || isArchived;
   const timingBadgeVariant =
-    timing === "Ended" || timing === "Completed"
+    timing === "Ended" || timing === "Completed" || isArchived
       ? "muted"
       : timing === "Upcoming"
         ? "accent"
@@ -156,9 +192,35 @@ function SaleCard({
       />
 
       <div className="p-4 pb-3">
-        <div className="mb-2.5 flex flex-wrap items-center gap-1.5">
-          <Badge variant={timingBadgeVariant}>{timing}</Badge>
-          <Badge variant="outline">{sale.assignedTeam?.name ?? "Unassigned"}</Badge>
+        <div className="mb-2.5 flex items-start justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Badge variant={timingBadgeVariant}>{timing}</Badge>
+            <Badge variant="outline">{sale.assignedTeam?.name ?? "Unassigned"}</Badge>
+          </div>
+          {canManageSales ? (
+            <form action={archiveEstateSaleAction} className="relative z-10 shrink-0">
+              <input type="hidden" name="saleId" value={sale.id} />
+              <input type="hidden" name="returnTo" value="sales" />
+              <input
+                type="hidden"
+                name="includeArchived"
+                value={includeArchived ? "true" : "false"}
+              />
+              <Button type="submit" size="sm" variant="ghost">
+                {isArchived ? (
+                  <>
+                    <RotateCcw aria-hidden="true" />
+                    Restore
+                  </>
+                ) : (
+                  <>
+                    <Archive aria-hidden="true" />
+                    Archive
+                  </>
+                )}
+              </Button>
+            </form>
+          ) : null}
         </div>
 
         <h2 className="font-display text-lg font-bold leading-tight">
@@ -234,10 +296,14 @@ function SaleCard({
 
 function SaleGrid({
   sales,
-  today
+  today,
+  canManageSales,
+  includeArchived
 }: {
   sales: ListedSale[];
   today: Date;
+  canManageSales: boolean;
+  includeArchived: boolean;
 }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -246,6 +312,8 @@ function SaleGrid({
           key={sale.id}
           sale={sale}
           timing={saleTiming(sale, today)}
+          canManageSales={canManageSales}
+          includeArchived={includeArchived}
         />
       ))}
     </div>
@@ -259,14 +327,29 @@ export default async function SalesPage({
 }) {
   const user = await requireUser();
   const params = (await searchParams) ?? {};
-  const sales = await getListedSales(user);
+  const includeArchived = shouldIncludeArchivedSales(
+    params[INCLUDE_ARCHIVED_SALES_PARAM]
+  );
+  const sales = await getListedSales(user, includeArchived);
   const today = startOfLocalDay();
   const currentSales = sales
-    .filter((sale) => isCurrentOrUpcomingSale(sale, today))
+    .filter(
+      (sale) =>
+        sale.status !== SaleStatus.ARCHIVED &&
+        isCurrentOrUpcomingSale(sale, today)
+    )
     .sort(sortCurrentSales);
   const endedSales = sales
-    .filter((sale) => !isCurrentOrUpcomingSale(sale, today))
+    .filter(
+      (sale) =>
+        sale.status !== SaleStatus.ARCHIVED &&
+        !isCurrentOrUpcomingSale(sale, today)
+    )
     .sort(sortEndedSales);
+  const archivedSales = sales
+    .filter((sale) => sale.status === SaleStatus.ARCHIVED)
+    .sort(sortArchivedSales);
+  const canManageSales = user.role === Role.MANAGEMENT;
 
   return (
     <AppShell user={user}>
@@ -287,12 +370,30 @@ export default async function SalesPage({
             Open a sale
           </h1>
         </div>
-        <Button asChild size="lg" variant="accent" className="hidden sm:inline-flex">
-          <Link href="/sales/new">
-            <Plus aria-hidden="true" />
-            New sale
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline">
+            <Link
+              href={
+                includeArchived
+                  ? "/sales"
+                  : `/sales?${INCLUDE_ARCHIVED_SALES_PARAM}=true`
+              }
+            >
+              {includeArchived ? (
+                <EyeOff aria-hidden="true" />
+              ) : (
+                <Eye aria-hidden="true" />
+              )}
+              {includeArchived ? "Hide archived" : "Show archived"}
+            </Link>
+          </Button>
+          <Button asChild size="lg" variant="accent" className="hidden sm:inline-flex">
+            <Link href="/sales/new">
+              <Plus aria-hidden="true" />
+              New sale
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Always-visible new-sale path for the on-site team-created flow. */}
@@ -354,7 +455,12 @@ export default async function SalesPage({
                 </div>
               </Card>
             ) : (
-              <SaleGrid sales={currentSales} today={today} />
+              <SaleGrid
+                sales={currentSales}
+                today={today}
+                canManageSales={canManageSales}
+                includeArchived={includeArchived}
+              />
             )}
           </section>
 
@@ -370,7 +476,41 @@ export default async function SalesPage({
                 <Badge variant="muted">{endedSales.length}</Badge>
               </div>
 
-              <SaleGrid sales={endedSales} today={today} />
+              <SaleGrid
+                sales={endedSales}
+                today={today}
+                canManageSales={canManageSales}
+                includeArchived={includeArchived}
+              />
+            </section>
+          ) : null}
+
+          {includeArchived ? (
+            <section aria-labelledby="archived-sales-heading">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h2
+                  id="archived-sales-heading"
+                  className="font-display text-lg font-bold tracking-tight text-muted-foreground"
+                >
+                  Archived sales
+                </h2>
+                <Badge variant="muted">{archivedSales.length}</Badge>
+              </div>
+
+              {archivedSales.length === 0 ? (
+                <Card className="border-dashed">
+                  <div className="p-6 text-center text-sm text-muted-foreground">
+                    No archived sales.
+                  </div>
+                </Card>
+              ) : (
+                <SaleGrid
+                  sales={archivedSales}
+                  today={today}
+                  canManageSales={canManageSales}
+                  includeArchived={includeArchived}
+                />
+              )}
             </section>
           ) : null}
         </div>

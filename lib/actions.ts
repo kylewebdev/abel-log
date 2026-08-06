@@ -25,6 +25,10 @@ import {
   isReportGroupColor,
   reportGroupColor
 } from "@/lib/report-groups";
+import {
+  saleListArchiveResultPath,
+  shouldIncludeArchivedSales
+} from "@/lib/sale-list";
 import { signIn, signOut } from "@/auth";
 
 const DEFAULT_REDIRECT = "/sales";
@@ -364,6 +368,10 @@ export async function toggleReportGroupAction(formData: FormData) {
 export async function archiveEstateSaleAction(formData: FormData) {
   const user = await requireManagement();
   const saleId = formId(formData.get("saleId"));
+  const returnToSales = formData.get("returnTo") === "sales";
+  const includeArchived = shouldIncludeArchivedSales(
+    formData.get("includeArchived")
+  );
 
   if (!saleId) {
     redirect("/sales");
@@ -397,7 +405,12 @@ export async function archiveEstateSaleAction(formData: FormData) {
 
   revalidatePath("/sales");
   revalidatePath(`/sales/${saleId}`);
-  redirect(`/sales/${saleId}?${archiving ? "archived" : "restored"}=1`);
+  const result = archiving ? "archived" : "restored";
+  redirect(
+    returnToSales
+      ? saleListArchiveResultPath({ includeArchived, result })
+      : `/sales/${saleId}?${result}=1`
+  );
 }
 
 export async function deleteEstateSaleAction(formData: FormData) {
