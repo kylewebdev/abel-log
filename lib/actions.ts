@@ -29,6 +29,7 @@ import {
   saleListArchiveResultPath,
   shouldIncludeArchivedSales
 } from "@/lib/sale-list";
+import { deleteEstateSaleRecords } from "@/lib/estate-sale-deletion";
 import { signIn, signOut } from "@/auth";
 
 const DEFAULT_REDIRECT = "/sales";
@@ -427,11 +428,9 @@ export async function deleteEstateSaleAction(formData: FormData) {
     redirect("/sales");
   }
 
-  // No FK cascade is defined, so clear child sold items before the sale.
-  await prisma.$transaction([
-    prisma.soldItem.deleteMany({ where: { estateSaleId: saleId } }),
-    prisma.estateSale.delete({ where: { id: saleId } })
-  ]);
+  await prisma.$transaction((transaction) =>
+    deleteEstateSaleRecords(transaction, saleId)
+  );
 
   await recordActivity({
     actorUserId: user.id,
