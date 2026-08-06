@@ -21,6 +21,9 @@ This is a small internal business app built with Next.js App Router, TypeScript,
 - Flat itemized sale report that defaults to non-archived items at or above the
   sale threshold, can be filtered to one report group or unassigned items, and
   is sorted by price.
+- Basecamp Signed-column automation that idempotently creates a sale and an
+  estate-sale project, grants the lead access, links the Sale Sheet, and
+  completes the sale-created milestone.
 
 ## Not In This MVP
 
@@ -107,6 +110,24 @@ Management workflow:
 3. Edit sale details, assign teams, or update item descriptions and prices.
 4. Archive, restore, or permanently delete entries as needed.
 5. Open a sale report to check the client-facing itemized output.
+
+## Basecamp Setup
+
+1. Apply the Prisma migrations and configure the `BASECAMP_*` values documented
+   in `.env.example`. The actor must be an active management user.
+2. Register the OAuth redirect URI exactly as
+   `https://log.abeliquidators.com/oauth/basecamp/callback`.
+3. Sign in to Abel Log as management and open `/oauth/basecamp` once to store
+   the Basecamp refresh token server-side.
+4. Register a `Kanban::Card` webhook on Basecamp project `48401748` pointing to
+   `https://log.abeliquidators.com/hooks/basecamp?token=<BASECAMP_WEBHOOK_TOKEN>`.
+
+The receiver acknowledges relevant events with HTTP 202, stores the card before
+responding, and performs the Basecamp work after the response. The unique card
+mapping prevents retries or repeated moves into Signed from creating duplicate
+sales or projects. Partial failures are retained as `NEEDS_ATTENTION` and retry
+from their last durable construction/project state if Basecamp delivers the card
+again.
 
 Report-group workflow:
 

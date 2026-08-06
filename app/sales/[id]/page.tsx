@@ -96,6 +96,7 @@ export default async function SaleDetailPage({
           },
           orderBy: [{ createdAt: "asc" }, { id: "asc" }]
         },
+        basecampLink: true,
         soldItems: {
           include: { reportGroup: true },
           orderBy: {
@@ -231,6 +232,59 @@ export default async function SaleDetailPage({
 
       {activeView === "details" ? (
         <section className="space-y-5" aria-labelledby="sale-details-heading">
+          {sale.basecampLink ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Basecamp automation</CardTitle>
+                <CardDescription>
+                  {sale.basecampLink.status === "COMPLETED"
+                    ? "Sale and Basecamp project are fully linked."
+                    : sale.basecampLink.status === "NEEDS_ATTENTION"
+                      ? "The automation needs a manual check."
+                      : "The Basecamp project is still being prepared."}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <div className="flex flex-wrap gap-2">
+                  {sale.basecampLink.cardAppUrl ? (
+                    <Button asChild size="sm" variant="outline">
+                      <a
+                        href={sale.basecampLink.cardAppUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Open client card
+                      </a>
+                    </Button>
+                  ) : null}
+                  {sale.basecampLink.basecampProjectId ? (
+                    <Button asChild size="sm" variant="outline">
+                      <a
+                        href={
+                          sale.basecampLink.basecampProjectAppUrl ??
+                          `https://3.basecamp.com/6255208/projects/${sale.basecampLink.basecampProjectId}`
+                        }
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Open Basecamp project
+                      </a>
+                    </Button>
+                  ) : null}
+                </div>
+                {sale.basecampLink.manualFollowUp ? (
+                  <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 font-semibold text-amber-950">
+                    {sale.basecampLink.manualFollowUp}
+                  </p>
+                ) : null}
+                {sale.basecampLink.lastError ? (
+                  <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 font-semibold text-destructive">
+                    {sale.basecampLink.lastError}
+                  </p>
+                ) : null}
+              </CardContent>
+            </Card>
+          ) : null}
           <Card>
             <CardHeader>
               <CardTitle id="sale-details-heading">Edit sale details</CardTitle>

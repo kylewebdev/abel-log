@@ -14,7 +14,8 @@ const messages: Record<string, string> = {
     "Report group paused. Existing tagged items and reports are unchanged.",
   archived: "Sale archived — hidden from the active list.",
   restored: "Sale restored to the active list.",
-  deleted: "Sale deleted."
+  deleted: "Sale deleted.",
+  basecamp: "Basecamp authorization connected."
 };
 
 export function StatusMessage({
