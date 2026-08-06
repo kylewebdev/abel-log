@@ -129,6 +129,42 @@ sales or projects. Partial failures are retained as `NEEDS_ATTENTION` and retry
 from their last durable construction/project state if Basecamp delivers the card
 again.
 
+### Website lead intake
+
+`POST /hooks/intake` creates a new card in the Triage column of the Basecamp
+`Estate Consults & Leads` project. It is a server-to-server endpoint; do not call
+it from browser code or expose its token in a `NEXT_PUBLIC_` variable.
+
+Configure a long random `INTAKE_WEBHOOK_TOKEN` in Abel Log, and store the same
+value as `ABEL_LOG_INTAKE_TOKEN` in the main website's server-side environment.
+The website sends:
+
+```http
+Authorization: Bearer <ABEL_LOG_INTAKE_TOKEN>
+Content-Type: application/json
+```
+
+```json
+{
+  "submissionId": "a-unique-id-for-this-form-submission",
+  "name": "Jane Smith",
+  "phone": "555-0100",
+  "email": "jane@example.com",
+  "propertyAddress": "123 Main St",
+  "city": "Sacramento",
+  "situation": "downsizing",
+  "contactMethod": "phone",
+  "description": "Looking for help with an estate sale."
+}
+```
+
+`submissionId`, `name`, `email`, and `description` are required. Snake-case
+`submission_id`, `property_address`, and `contact_method` aliases are also
+accepted. Reusing a submission ID with the same data returns the existing card;
+reusing it with different data is rejected. Intake records that encounter an
+uncertain Basecamp failure are held for manual attention instead of retrying and
+risking a duplicate card.
+
 Report-group workflow:
 
 1. Management opens a sale’s `Edit details` tab and creates the needed

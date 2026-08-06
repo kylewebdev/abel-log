@@ -178,7 +178,11 @@ function sleep(milliseconds: number) {
 }
 
 export class BasecampClient {
-  private async fetchResponse(path: string, init: RequestInit = {}) {
+  private async fetchResponse(
+    path: string,
+    init: RequestInit = {},
+    retryTransientFailures = true
+  ) {
     const { apiBaseUrl, userAgent } = basecampApiConfig();
     const token = await accessToken();
     const url = path.startsWith("https://") ? path : `${apiBaseUrl}${path}`;
@@ -208,7 +212,11 @@ export class BasecampClient {
         return response;
       }
 
-      if ((response.status === 429 || response.status >= 500) && attempt < 2) {
+      if (
+        retryTransientFailures &&
+        (response.status === 429 || response.status >= 500) &&
+        attempt < 2
+      ) {
         await sleep(retryDelay(response, attempt));
         continue;
       }
@@ -224,8 +232,16 @@ export class BasecampClient {
     throw new Error(`Basecamp API ${path} exhausted its retries`);
   }
 
-  async request<T>(path: string, init: RequestInit = {}): Promise<T> {
-    const response = await this.fetchResponse(path, init);
+  async request<T>(
+    path: string,
+    init: RequestInit = {},
+    retryTransientFailures = true
+  ): Promise<T> {
+    const response = await this.fetchResponse(
+      path,
+      init,
+      retryTransientFailures
+    );
     if (response.status === 204) {
       return undefined as T;
     }
@@ -269,6 +285,17 @@ export class BasecampClient {
       method: "POST",
       body: body === undefined ? undefined : JSON.stringify(body)
     });
+  }
+
+  postOnce<T>(path: string, body?: unknown) {
+    return this.request<T>(
+      path,
+      {
+        method: "POST",
+        body: body === undefined ? undefined : JSON.stringify(body)
+      },
+      false
+    );
   }
 
   put<T>(path: string, body: unknown) {
