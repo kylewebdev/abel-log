@@ -11,7 +11,7 @@ import {
   updateSoldItemAction
 } from "@/lib/actions";
 import { canDeleteItem, canManageItem } from "@/lib/permissions";
-import { centsToInput, saleTitle } from "@/lib/format";
+import { centsToInput, itemLabel, saleTitle } from "@/lib/format";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -92,7 +92,7 @@ export default async function EditItemPage({
           ) : null}
         </div>
         <h1 className="font-display text-2xl font-extrabold leading-tight tracking-tight">
-          {item.itemDescription}
+          {itemLabel(item)}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {saleTitle(item.estateSale)}
@@ -106,6 +106,11 @@ export default async function EditItemPage({
         {paramsValue.error === "group" ? (
           <div className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-sm font-semibold text-destructive">
             Choose a report group that belongs to this sale.
+          </div>
+        ) : null}
+        {paramsValue.error === "quantity" ? (
+          <div className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-sm font-semibold text-destructive">
+            Quantity must be a whole number of at least 1.
           </div>
         ) : null}
 
@@ -145,7 +150,22 @@ export default async function EditItemPage({
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="price">Final sold price</Label>
+            <Label htmlFor="quantity">Quantity</Label>
+            <Input
+              id="quantity"
+              name="quantity"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={2147483647}
+              step={1}
+              defaultValue={item.quantity}
+              required
+              className="h-14 max-w-32 text-lg font-semibold"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="price">Total sold price</Label>
             <div className="relative max-w-xs">
               <span
                 className="price pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-lg font-bold text-muted-foreground"
@@ -193,7 +213,7 @@ export default async function EditItemPage({
               <ConfirmButton
                 type="submit"
                 variant="destructive"
-                confirmMessage={`Permanently delete "${item.itemDescription}"? This cannot be undone.`}
+                confirmMessage={`Permanently delete "${itemLabel(item)}"? This cannot be undone.`}
               >
                 <Trash2 aria-hidden="true" />
                 Delete item permanently

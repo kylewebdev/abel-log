@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CheckCircle2, Plus, Rows3, Save, Trash2 } from "lucide-react";
+import { CheckCircle2, Plus, Save, Trash2 } from "lucide-react";
+import { parseQuantity } from "@/lib/format";
 import { createBatchItemsAction } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,7 @@ type Row = {
   id: number;
   description: string;
   price: string;
+  quantity: string;
 };
 
 let rowCounter = 0;
@@ -20,7 +22,8 @@ function blankRow(): Row {
   return {
     id: rowCounter,
     description: "",
-    price: ""
+    price: "",
+    quantity: "1"
   };
 }
 
@@ -37,7 +40,7 @@ export function BatchEntryForm({
 }) {
   const [rows, setRows] = useState<Row[]>(() => [blankRow(), blankRow(), blankRow()]);
 
-  const { filledCount, partialCount } = useMemo(
+  const { filledCount, partialCount, invalidQuantityCount } = useMemo(
     () =>
       rows.reduce(
         (counts, row) => {
@@ -45,14 +48,18 @@ export function BatchEntryForm({
           const hasPrice = Boolean(row.price.trim());
 
           if (hasDescription && hasPrice) {
-            counts.filledCount += 1;
+            if (parseQuantity(row.quantity) === null) {
+              counts.invalidQuantityCount += 1;
+            } else {
+              counts.filledCount += 1;
+            }
           } else if (hasDescription || hasPrice) {
             counts.partialCount += 1;
           }
 
           return counts;
         },
-        { filledCount: 0, partialCount: 0 }
+        { filledCount: 0, partialCount: 0, invalidQuantityCount: 0 }
       ),
     [rows]
   );
@@ -71,16 +78,18 @@ export function BatchEntryForm({
     setRows((current) =>
       current.length === 1
         ? current.map((row) =>
-            row.id === id ? { ...row, description: "", price: "" } : row
+            row.id === id ? { ...row, description: "", price: "", quantity: "1" } : row
           )
         : current.filter((row) => row.id !== id)
     );
   }
 
   const saveHelp =
-    filledCount === 0
+    invalidQuantityCount > 0
+      ? "Quantity must be a whole number of at least 1."
+      : filledCount === 0
       ? partialCount > 0
-        ? "Finish both fields in an item to turn on Save items."
+        ? "Complete an item to turn on Save items."
         : "Add a description and price to turn on Save items."
       : partialCount > 0
         ? `${filledCount} ready. ${partialCount} incomplete ${partialCount === 1 ? "row will" : "rows will"} be skipped.`
@@ -94,27 +103,15 @@ export function BatchEntryForm({
         <ReportGroupPicker saleId={saleId} groups={reportGroups} />
       </div>
 
-      <div className="mb-4 flex gap-3 rounded-lg border border-border bg-muted/45 p-3.5">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-card text-accent shadow-sm">
-          <Rows3 className="size-4.5" aria-hidden="true" />
-        </span>
-        <div>
-          <p className="font-display text-sm font-bold">Each card is one sold item</p>
-          <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
-            Fill in both fields for every item you want to save. Use the clearly
-            labeled Delete row button to discard an item you do not need.
-          </p>
-        </div>
-      </div>
-
       <div className="space-y-3">
         {rows.map((row, index) => {
           const hasDescription = Boolean(row.description.trim());
           const hasPrice = Boolean(row.price.trim());
-          const isReady = hasDescription && hasPrice;
-          const isPartial = hasDescription !== hasPrice;
+          const isReady = hasDescription && hasPrice && parseQuantity(row.quantity) !== null;
+          const isPartial = (hasDescription || hasPrice) && !isReady;
           const descriptionId = `batch-description-${row.id}`;
           const priceId = `batch-price-${row.id}`;
+          const quantityId = `batch-quantity-${row.id}`;
 
           return (
             <fieldset
@@ -134,7 +131,7 @@ export function BatchEntryForm({
                     </span>
                   ) : isPartial ? (
                     <span className="text-xs font-semibold text-muted-foreground">
-                      Needs both fields
+                      Incomplete
                     </span>
                   ) : null}
                 </div>
@@ -167,7 +164,26 @@ export function BatchEntryForm({
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor={priceId}>Final sold price</Label>
+                <Label htmlFor={quantityId}>Quantity</Label>
+                <Input
+                  id={quantityId}
+                  name="quantity[]"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={2147483647}
+                  step={1}
+                  value={row.quantity}
+                  onChange={(event) =>
+                    updateRow(row.id, { quantity: event.target.value })
+                  }
+                  required={hasDescription && hasPrice}
+                  className="max-w-32 font-semibold"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor={priceId}>Total sold price</Label>
                 <div className="relative max-w-xs">
                   <span
                     className="price pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-base font-bold text-muted-foreground"
@@ -219,9 +235,9 @@ export function BatchEntryForm({
             size="xl"
             variant="accent"
             className="w-full flex-1"
-            disabled={filledCount === 0}
+            disabled={filledCount === 0 || invalidQuantityCount > 0}
             aria-describedby="batch-save-help"
-            title={filledCount === 0 ? saveHelp : undefined}
+            title={filledCount === 0 || invalidQuantityCount > 0 ? saveHelp : undefined}
           >
             <Save aria-hidden="true" />
             Save {filledCount > 0 ? `${filledCount} ` : ""}item

@@ -185,6 +185,7 @@ model SoldItem {
   reportGroupId       Int?
   reportGroup         ReportGroup? @relation(fields: [reportGroupId, estateSaleId], references: [id, estateSaleId], onDelete: Restrict)
   itemDescription     String
+  quantity            Int          @default(1)
   finalSoldPriceCents Int
   entrySource         EntrySource  @default(LIVE_APP)
   isArchived          Boolean      @default(false)

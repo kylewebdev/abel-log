@@ -64,6 +64,12 @@ export default async function BatchEntryPage({
         </div>
       ) : null}
 
+      {paramsValue.error === "quantity" ? (
+        <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-sm font-semibold text-destructive">
+          Quantity must be a whole number of at least 1. No items were saved.
+        </div>
+      ) : null}
+
       <BatchEntryForm saleId={sale.id} reportGroups={sale.reportGroups} />
     </AppShell>
   );

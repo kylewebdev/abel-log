@@ -9,7 +9,7 @@ import {
   restoreSoldItemAction
 } from "@/lib/actions";
 import { canDeleteItem, canManageItem } from "@/lib/permissions";
-import { centsToDollars, saleTitle, shortDate } from "@/lib/format";
+import { centsToDollars, itemLabel, saleTitle, shortDate } from "@/lib/format";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -72,7 +72,7 @@ export default async function TeamRecentPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="font-semibold leading-snug">
-                      {item.itemDescription}
+                      {itemLabel(item)}
                     </div>
                     <Link
                       href={`/sales/${item.estateSaleId}`}
@@ -135,7 +135,7 @@ export default async function TeamRecentPage() {
                             variant="ghost"
                             size="sm"
                             className="text-destructive hover:text-destructive"
-                            confirmMessage={`Permanently delete "${item.itemDescription}"? This cannot be undone.`}
+                            confirmMessage={`Permanently delete "${itemLabel(item)}"? This cannot be undone.`}
                           >
                             <Trash2 aria-hidden="true" />
                             Delete

@@ -50,6 +50,23 @@ export function centsToInput(cents: number) {
   return (cents / 100).toFixed(2);
 }
 
+export function parseQuantity(value: FormDataEntryValue | null) {
+  // Older entry forms omit quantity and represent a single item or bundle.
+  if (value === null) return 1;
+  if (typeof value !== "string" || !/^\d+$/.test(value.trim())) return null;
+
+  const quantity = Number(value);
+  return Number.isInteger(quantity) && quantity > 0 && quantity <= 2147483647
+    ? quantity
+    : null;
+}
+
+export function itemLabel(item: { itemDescription: string; quantity: number }) {
+  return item.quantity > 1
+    ? `${item.quantity}x ${item.itemDescription}`
+    : item.itemDescription;
+}
+
 export function shortDate(value: Date | string | null | undefined) {
   if (!value) {
     return "Not set";
@@ -97,10 +114,16 @@ export function optionalString(value: FormDataEntryValue | null) {
 }
 
 export function parseDateInput(value: FormDataEntryValue | null) {
-  if (typeof value !== "string" || value.trim() === "") {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return null;
   }
 
   const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? null : date;
+  const [year, month, day] = value.split("-").map(Number);
+  return !Number.isNaN(date.getTime()) &&
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day
+    ? date
+    : null;
 }

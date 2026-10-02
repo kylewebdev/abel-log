@@ -43,6 +43,7 @@ async function getListedSales(
       soldItems: {
         select: {
           id: true,
+          quantity: true,
           isArchived: true
         }
       }
@@ -167,6 +168,7 @@ function SaleCard({
   includeArchived: boolean;
 }) {
   const activeEntries = sale.soldItems.filter((item) => !item.isArchived);
+  const itemCount = activeEntries.reduce((sum, item) => sum + item.quantity, 0);
   const isArchived = timing === "Archived";
   const isEnded = timing === "Ended" || timing === "Completed" || isArchived;
   const timingBadgeVariant =
@@ -233,10 +235,10 @@ function SaleCard({
 
         <div className="mt-3 flex items-baseline gap-2">
           <span className="price text-3xl font-bold text-foreground">
-            {activeEntries.length}
+            {itemCount}
           </span>
           <span className="text-sm text-muted-foreground">
-            item{activeEntries.length === 1 ? "" : "s"} logged
+            item{itemCount === 1 ? "" : "s"} logged
           </span>
           <span className="ml-auto text-xs text-muted-foreground">
             <span className="price">

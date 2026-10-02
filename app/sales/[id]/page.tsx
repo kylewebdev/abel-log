@@ -33,7 +33,7 @@ import {
   canEditSale,
   canManageItem
 } from "@/lib/permissions";
-import { centsToDollars, centsToInput, saleTitle, shortDate } from "@/lib/format";
+import { centsToDollars, centsToInput, itemLabel, saleTitle, shortDate } from "@/lib/format";
 import { AppShell } from "@/components/app-shell";
 import { StatusMessage } from "@/components/status-message";
 import { Button } from "@/components/ui/button";
@@ -419,8 +419,7 @@ export default async function SaleDetailPage({
                             ) : null}
                           </div>
                           <span className="text-xs font-semibold text-muted-foreground">
-                            {group._count.soldItems} tagged item
-                            {group._count.soldItems === 1 ? "" : "s"}
+                            {group._count.soldItems} tagged entr{group._count.soldItems === 1 ? "y" : "ies"}
                           </span>
                         </div>
                         <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
@@ -581,8 +580,8 @@ export default async function SaleDetailPage({
         <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
           <section className="space-y-4">
             <div className="grid grid-cols-2 gap-2">
-              <Stat label="Active" value={activeItems.length} />
-              <Stat label="Archived" value={archivedItems.length} />
+              <Stat label="Active" value={activeItems.reduce((sum, item) => sum + item.quantity, 0)} />
+              <Stat label="Archived" value={archivedItems.reduce((sum, item) => sum + item.quantity, 0)} />
             </div>
 
             <div>
@@ -614,7 +613,7 @@ export default async function SaleDetailPage({
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="font-semibold leading-snug">
-                              {item.itemDescription}
+                              {itemLabel(item)}
                             </div>
                             <div className="mt-0.5 text-xs text-muted-foreground">
                               Added {shortDate(item.createdAt)}
@@ -700,7 +699,7 @@ export default async function SaleDetailPage({
                                     variant="ghost"
                                     size="sm"
                                     className="text-destructive hover:text-destructive"
-                                    confirmMessage={`Permanently delete "${item.itemDescription}"? This cannot be undone.`}
+                                    confirmMessage={`Permanently delete "${itemLabel(item)}"? This cannot be undone.`}
                                   >
                                     <Trash2 aria-hidden="true" />
                                     Delete

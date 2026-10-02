@@ -35,16 +35,9 @@ export default async function NewSalePage({
           className="-ml-1 mb-3"
         />
 
-        <p className="text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">
-          New estate sale
-        </p>
         <h1 className="font-display text-2xl font-extrabold tracking-tight sm:text-3xl">
-          Address first. Details later.
+          New estate sale
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          The only thing you need is the address. We&apos;ll open item entry right
-          after.
-        </p>
 
         {params.error === "address" ? (
           <div className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-sm font-semibold text-destructive">
@@ -53,7 +46,14 @@ export default async function NewSalePage({
         ) : null}
         {params.error === "team" ? (
           <div className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-sm font-semibold text-destructive">
-            This team account is not assigned to an active team.
+            {isManager
+              ? "Choose an active team to create a sale."
+              : "This team account is not assigned to an active team."}
+          </div>
+        ) : null}
+        {params.error === "date" ? (
+          <div className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-sm font-semibold text-destructive">
+            A valid start date is required to create a sale.
           </div>
         ) : null}
 
@@ -80,6 +80,25 @@ export default async function NewSalePage({
             </p>
           </div>
 
+          <div className="mt-4 space-y-1.5">
+            <Label htmlFor="startDate">Start date (required)</Label>
+            <Input id="startDate" name="startDate" type="date" required />
+          </div>
+
+          {isManager ? (
+            <div className="mt-4 space-y-1.5">
+              <Label htmlFor="assignedTeamId">Assigned team (required)</Label>
+              <Select id="assignedTeamId" name="assignedTeamId" defaultValue="" required>
+                <option value="" disabled>Choose a team</option>
+                {teams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          ) : null}
+
           <details className="mt-4 rounded-md border border-border bg-muted/30">
             <summary className="cursor-pointer p-3.5 text-sm font-bold">
               Optional sale details
@@ -98,10 +117,6 @@ export default async function NewSalePage({
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="startDate">Start date</Label>
-                <Input id="startDate" name="startDate" type="date" />
-              </div>
-              <div className="space-y-1.5">
                 <Label htmlFor="endDate">End date</Label>
                 <Input id="endDate" name="endDate" type="date" />
               </div>
@@ -115,19 +130,6 @@ export default async function NewSalePage({
                   className="price"
                 />
               </div>
-              {isManager ? (
-                <div className="space-y-1.5">
-                  <Label htmlFor="assignedTeamId">Assigned team</Label>
-                  <Select id="assignedTeamId" name="assignedTeamId">
-                    <option value="">No assigned team</option>
-                    {teams.map((team) => (
-                      <option key={team.id} value={team.id}>
-                        {team.name}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-              ) : null}
               <div className="space-y-1.5 sm:col-span-2">
                 <Label htmlFor="notes">Notes</Label>
                 <Textarea

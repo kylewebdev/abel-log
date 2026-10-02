@@ -13,7 +13,8 @@ import {
   dollarsToCents,
   normalizeAddress,
   optionalString,
-  parseDateInput
+  parseDateInput,
+  parseQuantity
 } from "@/lib/format";
 import { requireManagement, requireUser } from "@/lib/auth";
 import {
@@ -105,7 +106,26 @@ export async function createEstateSaleAction(formData: FormData) {
     redirect("/sales/new?error=address");
   }
 
-  if (user.role === Role.TEAM && !user.teamId) {
+  const startDate = parseDateInput(formData.get("startDate"));
+  if (!startDate) {
+    redirect("/sales/new?error=date");
+  }
+
+  const assignedTeamId =
+    user.role === Role.TEAM
+      ? user.teamId
+      : formId(formData.get("assignedTeamId"));
+
+  if (!assignedTeamId) {
+    redirect("/sales/new?error=team");
+  }
+
+  const assignedTeam = await prisma.team.findFirst({
+    where: { id: assignedTeamId, isActive: true },
+    select: { id: true }
+  });
+
+  if (!assignedTeam) {
     redirect("/sales/new?error=team");
   }
 
@@ -131,10 +151,6 @@ export async function createEstateSaleAction(formData: FormData) {
 
   const reportThresholdCents =
     dollarsToCents(formData.get("reportThreshold")) ?? 2500;
-  const assignedTeamId =
-    user.role === Role.TEAM
-      ? user.teamId
-      : formId(formData.get("assignedTeamId"));
 
   const sale = await prisma.estateSale.create({
     data: {
@@ -146,7 +162,7 @@ export async function createEstateSaleAction(formData: FormData) {
       notes: optionalString(formData.get("notes")),
       status: SaleStatus.ACTIVE,
       reportThresholdCents,
-      startDate: parseDateInput(formData.get("startDate")),
+      startDate,
       endDate: parseDateInput(formData.get("endDate")),
       assignedTeamId,
       createdByUserId: user.id,
@@ -509,9 +525,13 @@ export async function createSoldItemAction(formData: FormData) {
   const saleId = formId(formData.get("saleId"));
   const description = optionalString(formData.get("description"));
   const priceCents = dollarsToCents(formData.get("price"));
+  const quantity = parseQuantity(formData.get("quantity"));
 
   if (!saleId || !description || priceCents === null) {
     redirect(saleId ? `/sales/${saleId}/quick-entry?error=missing` : "/sales");
+  }
+  if (quantity === null) {
+    redirect(`/sales/${saleId}/quick-entry?error=quantity`);
   }
 
   await requireSaleItemAccess({ user, saleId });
@@ -535,6 +555,7 @@ export async function createSoldItemAction(formData: FormData) {
       createdByUserId: user.id,
       reportGroupId,
       itemDescription: description,
+      quantity,
       finalSoldPriceCents: priceCents,
       entrySource: source,
       soldDate: new Date()
@@ -579,6 +600,7 @@ export async function createBatchItemsAction(formData: FormData) {
 
   const descriptions = formData.getAll("description[]");
   const prices = formData.getAll("price[]");
+  const quantities = formData.getAll("quantity[]");
 
   const rows = descriptions.map((rawDescription, index) => {
     const description = optionalString(rawDescription);
@@ -592,12 +614,18 @@ export async function createBatchItemsAction(formData: FormData) {
       return null;
     }
 
+    const quantity = parseQuantity(quantities[index] ?? null);
+    if (quantity === null) {
+      redirect(`/sales/${saleId}/batch?error=quantity`);
+    }
+
     return {
       estateSaleId: saleId,
       submittedTeamId: user.role === Role.TEAM ? user.teamId : null,
       createdByUserId: user.id,
       reportGroupId,
       itemDescription: description,
+      quantity,
       finalSoldPriceCents: priceCents,
       entrySource: EntrySource.PAPER,
       soldDate: new Date()
@@ -651,9 +679,15 @@ export async function updateSoldItemAction(formData: FormData) {
   const description = optionalString(formData.get("description"));
   const priceCents = dollarsToCents(formData.get("price"));
   const requestedReportGroupId = formId(formData.get("reportGroupId"));
+  const quantity = formData.has("quantity")
+    ? parseQuantity(formData.get("quantity"))
+    : before.quantity;
 
   if (!description || priceCents === null) {
     redirect(`/items/${itemId}/edit?error=missing`);
+  }
+  if (quantity === null) {
+    redirect(`/items/${itemId}/edit?error=quantity`);
   }
 
   const reportGroupId = requestedReportGroupId
@@ -676,6 +710,7 @@ export async function updateSoldItemAction(formData: FormData) {
     where: { id: itemId },
     data: {
       itemDescription: description,
+      quantity,
       finalSoldPriceCents: priceCents,
       reportGroupId
     }

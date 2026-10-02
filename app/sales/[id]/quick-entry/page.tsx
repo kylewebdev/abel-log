@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { canAccessSale } from "@/lib/permissions";
 import { createSoldItemAction } from "@/lib/actions";
-import { centsToDollars } from "@/lib/format";
+import { centsToDollars, itemLabel } from "@/lib/format";
 import { AppShell } from "@/components/app-shell";
 import { SaleContextHeader } from "@/components/sale-context-header";
 import { StatusMessage } from "@/components/status-message";
@@ -77,6 +77,11 @@ export default async function QuickEntryPage({
           Choose an active report group before saving this item.
         </div>
       ) : null}
+      {paramsValue.error === "quantity" ? (
+        <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-sm font-semibold text-destructive">
+          Quantity must be a whole number of at least 1.
+        </div>
+      ) : null}
 
       <form action={createSoldItemAction}>
         <input type="hidden" name="saleId" value={sale.id} />
@@ -98,7 +103,23 @@ export default async function QuickEntryPage({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="price">Final sold price</Label>
+            <Label htmlFor="quantity">Quantity</Label>
+            <Input
+              id="quantity"
+              name="quantity"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={2147483647}
+              step={1}
+              defaultValue={1}
+              required
+              className="h-14 max-w-32 text-lg font-semibold"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="price">Total sold price</Label>
             <div className="relative">
               <span
                 className="price pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-muted-foreground"
@@ -170,7 +191,7 @@ export default async function QuickEntryPage({
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="truncate font-semibold">
-                      {item.itemDescription}
+                      {itemLabel(item)}
                     </span>
                     {justSaved && index === 0 ? (
                       <span className="stamp shrink-0 animate-stamp-in rounded border border-success/40 px-1.5 py-0.5 text-[0.6rem] text-success">

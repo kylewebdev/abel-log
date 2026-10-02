@@ -10,8 +10,8 @@ This is a small internal business app built with Next.js App Router, TypeScript,
 - Five seeded teams: Team A, Team B, Team C, Team D, and Team E.
 - Address-first estate sale creation with Active status and $25 report threshold defaults.
 - Date-sorted sales list, with ended sales separated below current/upcoming sales.
-- Team-owned estate sales: team-created sales are assigned to that team; management can assign any active team.
-- Quick sold-item entry for one item at a time.
+- Team-owned estate sales: team-created sales are assigned to that team; management must choose an active team when creating a sale.
+- Quick sold-item entry with quantity (defaults to 1) and a total sold price per entry.
 - Batch paper-note entry for rush-hour handwritten sheets.
 - Sale-specific, color-coded report groups with a sticky per-device selection
   for quick and batch entry.
@@ -92,7 +92,7 @@ Team-created sale flow:
 
 1. Log in as a team user.
 2. Go to `New Estate Sale`.
-3. Enter only an address.
+3. Enter an address and a required start date.
 4. Create the sale.
 5. Start adding items immediately.
 
@@ -100,7 +100,7 @@ Paper-note flow:
 
 1. Open an active sale.
 2. Choose `Batch Paper`.
-3. Enter handwritten rows with item or bundle description and price.
+3. Enter handwritten rows with item or bundle description, quantity, and total price.
 4. Save all rows.
 
 Management workflow:

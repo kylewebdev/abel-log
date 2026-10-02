@@ -4,7 +4,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { canAccessSale } from "@/lib/permissions";
-import { centsToDollars, saleTitle, shortDate } from "@/lib/format";
+import { centsToDollars, itemLabel, saleTitle, shortDate } from "@/lib/format";
 import { AppShell } from "@/components/app-shell";
 import { SaleContextHeader } from "@/components/sale-context-header";
 import { PrintButton } from "@/components/print-button";
@@ -175,7 +175,9 @@ export default async function SaleReportPage({
           </div>
           <div className="text-sm">
             <div>
-              <div className="price text-xl font-bold">{filteredItems.length}</div>
+              <div className="price text-xl font-bold">
+                {filteredItems.reduce((sum, item) => sum + item.quantity, 0)}
+              </div>
               <div className="text-xs text-muted-foreground">items</div>
             </div>
           </div>
@@ -285,7 +287,7 @@ export default async function SaleReportPage({
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="truncate font-medium">
-                      {item.itemDescription}
+                      {itemLabel(item)}
                     </span>
                     {item.isArchived ? <Badge variant="muted">Archived</Badge> : null}
                   </div>
