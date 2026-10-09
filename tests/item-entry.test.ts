@@ -1,6 +1,24 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { itemLabel, parseDateInput, parseQuantity } from "../lib/format";
+import { dollarsToCents, itemLabel, itemTotalCents, parseDateInput, parseQuantity } from "../lib/format";
+
+test("item totals follow quantity increases and decreases without compounding the price", () => {
+  const item = { finalSoldPriceCents: 2500, quantity: 1 };
+  assert.equal(itemTotalCents(item), 2500);
+  item.quantity = 4;
+  assert.equal(itemTotalCents(item), 10000);
+  item.quantity = 2;
+  assert.equal(itemTotalCents(item), 5000);
+  item.finalSoldPriceCents = 3000;
+  assert.equal(itemTotalCents(item), 6000);
+  item.quantity = 1;
+  assert.equal(itemTotalCents(item), 3000);
+});
+
+test("item totals multiply integer cents so decimal prices stay exact", () => {
+  assert.equal(itemTotalCents({ finalSoldPriceCents: dollarsToCents("19.99")!, quantity: 3 }), 5997);
+  assert.equal(itemTotalCents({ finalSoldPriceCents: 0, quantity: 4 }), 0);
+});
 
 test("quantity defaults for older forms and accepts positive whole numbers", () => {
   assert.equal(parseQuantity(null), 1);

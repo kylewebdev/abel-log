@@ -14,6 +14,7 @@ import { canDeleteItem, canManageItem } from "@/lib/permissions";
 import { centsToInput, itemLabel, saleTitle } from "@/lib/format";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
+import { SingleItemPriceFields } from "@/components/item-price-fields";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -149,40 +150,10 @@ export default async function EditItemPage({
               required
             />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="quantity">Quantity</Label>
-            <Input
-              id="quantity"
-              name="quantity"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={2147483647}
-              step={1}
-              defaultValue={item.quantity}
-              required
-              className="h-14 max-w-32 text-lg font-semibold"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="price">Total sold price</Label>
-            <div className="relative max-w-xs">
-              <span
-                className="price pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-lg font-bold text-muted-foreground"
-                aria-hidden="true"
-              >
-                $
-              </span>
-              <Input
-                id="price"
-                name="price"
-                inputMode="decimal"
-                defaultValue={centsToInput(item.finalSoldPriceCents)}
-                className="price h-14 pl-8 text-xl font-bold"
-                required
-              />
-            </div>
-          </div>
+          <SingleItemPriceFields
+            defaultQuantity={item.quantity}
+            defaultPrice={centsToInput(item.finalSoldPriceCents)}
+          />
 
         </form>
 

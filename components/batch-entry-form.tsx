@@ -7,6 +7,7 @@ import { createBatchItemsAction } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ItemPriceFields } from "@/components/item-price-fields";
 import { ReportGroupPicker } from "@/components/report-group-picker";
 
 type Row = {
@@ -110,8 +111,6 @@ export function BatchEntryForm({
           const isReady = hasDescription && hasPrice && parseQuantity(row.quantity) !== null;
           const isPartial = (hasDescription || hasPrice) && !isReady;
           const descriptionId = `batch-description-${row.id}`;
-          const priceId = `batch-price-${row.id}`;
-          const quantityId = `batch-quantity-${row.id}`;
 
           return (
             <fieldset
@@ -163,48 +162,14 @@ export function BatchEntryForm({
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor={quantityId}>Quantity</Label>
-                <Input
-                  id={quantityId}
-                  name="quantity[]"
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={2147483647}
-                  step={1}
-                  value={row.quantity}
-                  onChange={(event) =>
-                    updateRow(row.id, { quantity: event.target.value })
-                  }
-                  required={hasDescription && hasPrice}
-                  className="max-w-32 font-semibold"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor={priceId}>Total sold price</Label>
-                <div className="relative max-w-xs">
-                  <span
-                    className="price pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-base font-bold text-muted-foreground"
-                    aria-hidden="true"
-                  >
-                    $
-                  </span>
-                  <Input
-                    id={priceId}
-                    name="price[]"
-                    inputMode="decimal"
-                    value={row.price}
-                    onChange={(event) =>
-                      updateRow(row.id, { price: event.target.value })
-                    }
-                    placeholder="0.00"
-                    className="price pl-7 font-bold"
-                    autoComplete="off"
-                  />
-                </div>
-              </div>
+              <ItemPriceFields
+                idPrefix={`batch-${row.id}-`}
+                batch
+                quantity={row.quantity}
+                price={row.price}
+                onChange={(patch) => updateRow(row.id, patch)}
+                required={hasDescription && hasPrice}
+              />
             </fieldset>
           );
         })}

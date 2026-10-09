@@ -4,7 +4,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { canAccessSale } from "@/lib/permissions";
-import { centsToDollars, itemLabel, saleTitle, shortDate } from "@/lib/format";
+import { centsToDollars, itemLabel, itemTotalCents, saleTitle, shortDate } from "@/lib/format";
 import { AppShell } from "@/components/app-shell";
 import { SaleContextHeader } from "@/components/sale-context-header";
 import { PrintButton } from "@/components/print-button";
@@ -12,10 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ReportGroupBadge } from "@/components/report-group-badge";
-import {
-  matchesReportGroupFilter,
-  resolveReportGroupFilter
-} from "@/lib/report-groups";
+import { resolveReportGroupFilter } from "@/lib/report-groups";
+import { buildSaleReport } from "@/lib/sale-report";
 
 export default async function SaleReportPage({
   params,
@@ -40,10 +38,7 @@ export default async function SaleReportPage({
         orderBy: [{ createdAt: "asc" }, { id: "asc" }]
       },
       soldItems: {
-        include: { reportGroup: true },
-        orderBy: {
-          finalSoldPriceCents: "desc"
-        }
+        include: { reportGroup: true }
       }
     }
   });
@@ -70,22 +65,12 @@ export default async function SaleReportPage({
       ? sale.reportGroups.find((group) => group.id === groupFilter) ?? null
       : null;
 
-  const filteredItems = sale.soldItems
-    .filter((item) => includeArchived || !item.isArchived)
-    .filter((item) =>
-      matchesReportGroupFilter(item.reportGroupId, groupFilter)
-    )
-    .filter(
-      (item) =>
-        includeUnderThreshold ||
-        item.finalSoldPriceCents >= sale.reportThresholdCents
-    )
-    .sort((a, b) => b.finalSoldPriceCents - a.finalSoldPriceCents);
-
-  const totalCents = filteredItems.reduce(
-    (sum, item) => sum + item.finalSoldPriceCents,
-    0
-  );
+  const { items: filteredItems, totalCents, itemCount } = buildSaleReport(sale.soldItems, {
+    thresholdCents: sale.reportThresholdCents,
+    includeUnderThreshold,
+    includeArchived,
+    groupFilter
+  });
 
   const toggleHref = (key: string, value: boolean) => {
     const query = new URLSearchParams();
@@ -133,8 +118,8 @@ export default async function SaleReportPage({
       <div className="mb-4 hidden print:block">
         <p className="stamp text-[0.7rem] text-muted-foreground">
           {includeUnderThreshold
-            ? "all sold item prices"
-            : `items sold for ${centsToDollars(sale.reportThresholdCents)} or greater`}
+            ? "all sold item totals"
+            : `item totals of ${centsToDollars(sale.reportThresholdCents)} or greater`}
         </p>
         <h1 className="font-display text-2xl font-extrabold tracking-tight">
           {saleTitle(sale)}
@@ -176,7 +161,7 @@ export default async function SaleReportPage({
           <div className="text-sm">
             <div>
               <div className="price text-xl font-bold">
-                {filteredItems.reduce((sum, item) => sum + item.quantity, 0)}
+                {itemCount}
               </div>
               <div className="text-xs text-muted-foreground">items</div>
             </div>
@@ -273,7 +258,7 @@ export default async function SaleReportPage({
           <div className="flex items-center justify-between gap-3 border-b border-border bg-muted/40 px-4 py-2.5 print:break-after-avoid-page">
             <h2 className="font-display text-base font-bold">Itemized list</h2>
             <span className="text-xs text-muted-foreground">
-              Sorted highest to lowest
+              Sorted by total, highest to lowest
             </span>
           </div>
           <ul className="divide-y divide-border">
@@ -291,6 +276,11 @@ export default async function SaleReportPage({
                     </span>
                     {item.isArchived ? <Badge variant="muted">Archived</Badge> : null}
                   </div>
+                  {item.quantity > 1 ? (
+                    <div className="text-xs text-muted-foreground">
+                      {centsToDollars(item.finalSoldPriceCents)} each × {item.quantity}
+                    </div>
+                  ) : null}
                   {groupFilter === "all" && sale.reportGroups.length > 0 ? (
                     <ReportGroupBadge
                       group={item.reportGroup}
@@ -300,7 +290,7 @@ export default async function SaleReportPage({
                   ) : null}
                 </div>
                 <span className="price shrink-0 font-bold">
-                  {centsToDollars(item.finalSoldPriceCents)}
+                  {centsToDollars(itemTotalCents(item))}
                 </span>
               </li>
             ))}

@@ -33,7 +33,7 @@ import {
   canEditSale,
   canManageItem
 } from "@/lib/permissions";
-import { centsToDollars, centsToInput, itemLabel, saleTitle, shortDate } from "@/lib/format";
+import { centsToDollars, centsToInput, itemLabel, itemTotalCents, saleTitle, shortDate } from "@/lib/format";
 import { AppShell } from "@/components/app-shell";
 import { StatusMessage } from "@/components/status-message";
 import { Button } from "@/components/ui/button";
@@ -625,7 +625,7 @@ export default async function SaleDetailPage({
                             />
                           </div>
                           <div className="price shrink-0 text-lg font-bold">
-                            {centsToDollars(item.finalSoldPriceCents)}
+                            {centsToDollars(itemTotalCents(item))}
                           </div>
                         </div>
 

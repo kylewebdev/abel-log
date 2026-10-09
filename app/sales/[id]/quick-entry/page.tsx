@@ -5,13 +5,14 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { canAccessSale } from "@/lib/permissions";
 import { createSoldItemAction } from "@/lib/actions";
-import { centsToDollars, itemLabel } from "@/lib/format";
+import { centsToDollars, itemLabel, itemTotalCents } from "@/lib/format";
 import { AppShell } from "@/components/app-shell";
 import { SaleContextHeader } from "@/components/sale-context-header";
 import { StatusMessage } from "@/components/status-message";
 import { ReportGroupBadge } from "@/components/report-group-badge";
 import { ReportGroupPicker } from "@/components/report-group-picker";
 import { Button } from "@/components/ui/button";
+import { SingleItemPriceFields } from "@/components/item-price-fields";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -102,47 +103,11 @@ export default async function QuickEntryPage({
             />
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="quantity">Quantity</Label>
-            <Input
-              id="quantity"
-              name="quantity"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={2147483647}
-              step={1}
-              defaultValue={1}
-              required
-              className="h-14 max-w-32 text-lg font-semibold"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="price">Total sold price</Label>
-            <div className="relative">
-              <span
-                className="price pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-muted-foreground"
-                aria-hidden="true"
-              >
-                $
-              </span>
-              <Input
-                id="price"
-                name="price"
-                inputMode="decimal"
-                placeholder="0.00"
-                className="price h-16 pl-10 text-3xl font-bold"
-                required
-                autoComplete="off"
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Any amount is fine — report defaults to{" "}
-              <span className="price">{centsToDollars(sale.reportThresholdCents)}</span>{" "}
-              and up.
-            </p>
-          </div>
+          {/* Reset the controlled inputs after Save + add another creates an item. */}
+          <SingleItemPriceFields key={recentItems[0]?.id ?? "new"} />
+          <p className="text-xs text-muted-foreground">
+            Reports include item totals of {centsToDollars(sale.reportThresholdCents)} and up by default.
+          </p>
 
         </div>
 
@@ -206,7 +171,7 @@ export default async function QuickEntryPage({
                   />
                 </div>
                 <span className="price shrink-0 text-lg font-bold">
-                  {centsToDollars(item.finalSoldPriceCents)}
+                  {centsToDollars(itemTotalCents(item))}
                 </span>
               </li>
             ))}

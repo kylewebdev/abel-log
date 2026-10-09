@@ -9,7 +9,7 @@ import {
   restoreSoldItemAction
 } from "@/lib/actions";
 import { canDeleteItem, canManageItem } from "@/lib/permissions";
-import { centsToDollars, itemLabel, saleTitle, shortDate } from "@/lib/format";
+import { centsToDollars, itemLabel, itemTotalCents, saleTitle, shortDate } from "@/lib/format";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -88,7 +88,7 @@ export default async function TeamRecentPage() {
                     ) : null}
                   </div>
                   <div className="price shrink-0 text-lg font-bold">
-                    {centsToDollars(item.finalSoldPriceCents)}
+                    {centsToDollars(itemTotalCents(item))}
                   </div>
                 </div>
 

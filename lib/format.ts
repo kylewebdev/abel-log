@@ -67,6 +67,14 @@ export function itemLabel(item: { itemDescription: string; quantity: number }) {
     : item.itemDescription;
 }
 
+export function itemTotalCents(item: {
+  finalSoldPriceCents: number;
+  quantity: number;
+}) {
+  // The stored price is per item (or per bundle); totals are always derived.
+  return item.finalSoldPriceCents * item.quantity;
+}
+
 export function shortDate(value: Date | string | null | undefined) {
   if (!value) {
     return "Not set";

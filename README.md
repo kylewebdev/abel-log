@@ -11,7 +11,7 @@ This is a small internal business app built with Next.js App Router, TypeScript,
 - Address-first estate sale creation with Active status and $25 report threshold defaults.
 - Date-sorted sales list, with ended sales separated below current/upcoming sales.
 - Team-owned estate sales: team-created sales are assigned to that team; management must choose an active team when creating a sale.
-- Quick sold-item entry with quantity (defaults to 1) and a total sold price per entry.
+- Quick sold-item entry with quantity (defaults to 1) and a sold price per item or bundle. Entry and edit forms preview the total as price × quantity.
 - Batch paper-note entry for rush-hour handwritten sheets.
 - Sale-specific, color-coded report groups with a sticky per-device selection
   for quick and batch entry.
@@ -19,11 +19,17 @@ This is a small internal business app built with Next.js App Router, TypeScript,
 - Management permissions: assign teams, edit sales, restore entries, and permanently delete entries across all teams.
 - Entries can be edited, archived, restored by management, or permanently deleted.
 - Flat itemized sale report that defaults to non-archived items at or above the
-  sale threshold, can be filtered to one report group or unassigned items, and
-  is sorted by price.
+  sale threshold based on price × quantity, can be filtered to one report group
+  or unassigned items, and is sorted and totaled using those extended prices.
 - Basecamp Signed-column automation that idempotently creates a sale and an
   estate-sale project, grants the lead access, links the Sale Sheet, and
   completes the sale-created milestone.
+
+The stored `SoldItem.finalSoldPriceCents` is the price per item or bundle.
+Display and report totals are derived from that price multiplied by quantity,
+including existing entries; no data migration is needed. Existing entries whose
+price was entered as a combined total should have their price corrected to the
+per-item amount. A bundle sold for one combined price can use quantity 1.
 
 ## Not In This MVP
 
